@@ -37,18 +37,20 @@ export function AuthorizationModal({ isOpen, onClose, onAuthorize, actionType }:
             <AlertTriangle className="h-5 w-5" />
             {isDelete ? "Authorize Deletion" : "Authorize Edit"}
           </DialogTitle>
-          <DialogDescription className="pt-2 text-sm text-muted-foreground space-y-2">
-            {isDelete ? (
-              <>
-                <p>Deleting transaction records may permanently affect reporting accuracy, revenue calculations, inventory consumption records, and analytics.</p>
-                <p className="font-semibold text-foreground">This action cannot be undone. All deletions will be recorded in the audit logs.</p>
-              </>
-            ) : (
-              <>
-                <p>Editing transaction records can affect reports, analytics, inventory calculations, and financial data.</p>
-                <p className="font-semibold text-foreground">Proceed only if this correction is absolutely necessary. This action will be permanently recorded in the audit logs.</p>
-              </>
-            )}
+          <DialogDescription className="pt-2 text-sm text-muted-foreground space-y-2" asChild>
+            <div className="space-y-2">
+              {isDelete ? (
+                <>
+                  <div>Deleting transaction records may permanently affect reporting accuracy, revenue calculations, inventory consumption records, and analytics.</div>
+                  <div className="font-semibold text-foreground">This action cannot be undone. All deletions will be recorded in the audit logs.</div>
+                </>
+              ) : (
+                <>
+                  <div>Editing transaction records can affect reports, analytics, inventory calculations, and financial data.</div>
+                  <div className="font-semibold text-foreground">Proceed only if this correction is absolutely necessary. This action will be permanently recorded in the audit logs.</div>
+                </>
+              )}
+            </div>
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

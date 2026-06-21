@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, Plus, Trash2 } from "lucide-react";
+import { Search, Download, Plus, Trash2, Edit2 } from "lucide-react";
 
 import { Transaction, initialTransactions, OrderItem } from "./data";
 import { AddTransactionModal } from "./components/add-transaction-modal";
@@ -136,8 +136,7 @@ export default function SalesHistoryPage() {
       setRowData(prev => prev.map(tx => {
         if (tx.id === targetTx.id) {
            const updated = {
-              ...tx, 
-              status: "Void (Not Made)" as const,
+              ...targetTx, 
               lastModifiedBy: currentUser,
               lastModifiedAt: new Date().toISOString()
            };
@@ -238,6 +237,8 @@ export default function SalesHistoryPage() {
       headerName: "Actions",
       pinned: "right",
       width: 100,
+      minWidth: 100,
+      maxWidth: 100,
       sortable: false,
       filter: false,
       cellRenderer: (params: any) => {
@@ -379,7 +380,11 @@ export default function SalesHistoryPage() {
                 paginationPageSize={20}
                 onGridReady={onGridReady}
                 onSelectionChanged={onSelectionChanged}
-                onRowClicked={(e) => setDrawerTx(e.data)}
+                onRowClicked={(e) => {
+                  const target = e.event?.target as HTMLElement;
+                  if (target?.closest('button')) return;
+                  setDrawerTx(e.data);
+                }}
                 suppressCellFocus={true}
                 animateRows={true}
                 rowHeight={52}

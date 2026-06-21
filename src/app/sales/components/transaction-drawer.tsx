@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -10,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Transaction } from "../data";
 import { format } from "date-fns";
 
@@ -22,7 +25,38 @@ interface TransactionDrawerProps {
 }
 
 export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDelete }: TransactionDrawerProps) {
+  const [localStatus, setLocalStatus] = useState<string>("");
+  const [localPaymentMethod, setLocalPaymentMethod] = useState<string>("");
+  const [localCustomer, setLocalCustomer] = useState<string>("");
+
+  useEffect(() => {
+    if (transaction && isOpen) {
+      setLocalStatus(transaction.status);
+      setLocalPaymentMethod(transaction.paymentMethod);
+      setLocalCustomer(transaction.customerName);
+    }
+  }, [transaction, isOpen]);
+
   if (!transaction) return null;
+
+  const isDirty = localStatus !== transaction.status || 
+                  localPaymentMethod !== transaction.paymentMethod || 
+                  localCustomer !== transaction.customerName;
+
+  const handleSaveChanges = () => {
+    onEdit({
+      ...transaction,
+      status: localStatus as any,
+      paymentMethod: localPaymentMethod,
+      customerName: localCustomer
+    });
+  };
+
+  const handleDiscard = () => {
+    setLocalStatus(transaction.status);
+    setLocalPaymentMethod(transaction.paymentMethod);
+    setLocalCustomer(transaction.customerName);
+  };
 
   const formatDate = (dateStr: string) => {
     try {
@@ -32,19 +66,21 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    if (status === "Completed") return "default";
-    return "destructive";
-  };
-
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
-        <SheetHeader className="p-6 pb-0">
-          <SheetTitle>Transaction Details</SheetTitle>
-          <SheetDescription>
-            {transaction.orderId}
-          </SheetDescription>
+        <SheetHeader className="p-6 flex flex-row items-start justify-between border-b pb-4">
+          <div>
+            <SheetTitle>Transaction Details</SheetTitle>
+            <SheetDescription>
+              {transaction.orderId}
+            </SheetDescription>
+          </div>
+          <div className="flex gap-2 mr-6 mt-1">
+            <Button variant="default" size="sm" onClick={handleSaveChanges} disabled={!isDirty} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+              Save Changes
+            </Button>
+          </div>
         </SheetHeader>
         
         <ScrollArea className="flex-1 p-6">
@@ -53,7 +89,7 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
             {/* Transaction Information */}
             <section className="space-y-3">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Information</h3>
-              <div className="grid grid-cols-2 gap-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-y-3 text-sm items-center">
                 <div className="text-muted-foreground">Order ID</div>
                 <div className="font-medium text-right">{transaction.orderId}</div>
                 
@@ -61,20 +97,45 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
                 <div className="font-medium text-right">{formatDate(transaction.createdAt)}</div>
                 
                 <div className="text-muted-foreground">Customer</div>
-                <div className="font-medium text-right">{transaction.customerName}</div>
+                <div className="text-right">
+                  <Input 
+                    value={localCustomer} 
+                    onChange={(e) => setLocalCustomer(e.target.value)} 
+                    className="h-8 text-right text-sm"
+                  />
+                </div>
                 
                 <div className="text-muted-foreground">Status</div>
                 <div className="text-right">
-                   <Badge variant={getStatusBadgeVariant(transaction.status)} className="rounded-md">
-                     {transaction.status}
-                   </Badge>
+                   <Select value={localStatus} onValueChange={setLocalStatus}>
+                     <SelectTrigger className="h-8 text-sm">
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="Completed">Completed</SelectItem>
+                       <SelectItem value="Void (Not Made)">Void (Not Made)</SelectItem>
+                       <SelectItem value="Void (Consumed)">Void (Consumed)</SelectItem>
+                     </SelectContent>
+                   </Select>
                 </div>
                 
                 <div className="text-muted-foreground">Cashier</div>
                 <div className="font-medium text-right">{transaction.cashier}</div>
                 
                 <div className="text-muted-foreground">Payment Method</div>
-                <div className="font-medium text-right">{transaction.paymentMethod}</div>
+                <div className="text-right">
+                   <Select value={localPaymentMethod} onValueChange={setLocalPaymentMethod}>
+                     <SelectTrigger className="h-8 text-sm">
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="Cash">Cash</SelectItem>
+                       <SelectItem value="GCash">GCash</SelectItem>
+                       <SelectItem value="BPI">BPI</SelectItem>
+                       <SelectItem value="Maya">Maya</SelectItem>
+                     </SelectContent>
+                   </Select>
+                </div>
               </div>
             </section>
             
@@ -155,8 +216,11 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
 
         <SheetFooter className="p-6 pt-0 border-t mt-auto flex flex-col gap-2 sm:flex-col sm:space-x-0">
             <div className="flex w-full gap-2 pt-4">
-              <Button variant="outline" className="flex-1" onClick={() => onEdit(transaction)}>
-                Edit Transaction
+              <Button variant="outline" className="flex-1" onClick={handleDiscard} disabled={!isDirty}>
+                Discard
+              </Button>
+              <Button variant="default" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSaveChanges} disabled={!isDirty}>
+                Save Changes
               </Button>
               <Button variant="destructive" className="flex-1" onClick={() => onDelete(transaction)}>
                 Delete
