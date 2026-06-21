@@ -85,11 +85,12 @@ export function AppSidebar() {
                if (state === "collapsed") toggleSidebar()
             }}
           >
-            <div className={cn("relative aspect-square size-8 shrink-0 overflow-hidden flex items-center justify-center rounded-md", state === "collapsed" && "group-hover/logo:bg-sidebar-accent")}>
+            <div className={cn("relative aspect-square size-12 shrink-0 overflow-hidden flex items-center justify-center rounded-md", state === "collapsed" && "group-hover/logo:bg-sidebar-accent")}>
                <Image 
                  src="/sheilz_pos_logo.png" 
                  alt="Sheilz Coffee Logo" 
                  fill 
+                 sizes="48px"
                  className={cn("object-contain transition-opacity", state === "collapsed" && "group-hover/logo:opacity-0")} 
                />
                {state === "collapsed" && (
