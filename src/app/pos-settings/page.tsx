@@ -1,37 +1,123 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import { Plus, Search, Settings2, PackageOpen, ShoppingBag, Filter } from 'lucide-react';
 import { ProductCard } from './components/ProductCard';
 import { ProductModal } from './components/ProductModal';
 import { MoreSettingsModal } from './components/MoreSettingsModal';
-import { Product } from './types';
-import { 
-  initialProducts, 
-  initialCategories, 
-  initialPaymentMethods, 
-  initialSizes, 
+import { Product, Category } from './types';
+import { createClient } from '@/app/lib/supabase/client';
+import {
+  initialPaymentMethods,
+  initialSizes,
   initialTemperatures,
   initialIngredients
 } from './data';
 
 export default function POSSettingsPage() {
   // State
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [categories, setCategories] = useState(initialCategories);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods);
   const [sizes, setSizes] = useState(initialSizes);
   const [temperatures, setTemperatures] = useState(initialTemperatures);
   const [ingredients] = useState(initialIngredients);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const fetchAllData = async () => {
+      try {
+        const [productsRes, categoriesRes, paymentRes, sizesRes, tempsRes] =
+          await Promise.all([
+            supabase.from("products").select("*"),
+            supabase.from("product_categories").select("id, name").order("name"),
+            supabase
+              .from("payment_methods")
+              .select("id, name, is_enabled")
+              .order("name"),
+            supabase.from("sizes").select("id, name, sort_order").order("sort_order"),
+            supabase
+              .from("temperatures")
+              .select("id, name, sort_order")
+              .order("sort_order"),
+          ]);
+
+        if (productsRes.error) {
+          alert("Failed to load products: " + productsRes.error.message);
+        } else if (productsRes.data) {
+          setProducts(
+            productsRes.data.map((row: any) => ({
+              id: row.id,
+              name: row.name,
+              categoryId: row.category_id,
+              type: row.type,
+              image: row.image_url ?? undefined,
+              description: row.description ?? undefined,
+              hasRecipe: row.has_recipe,
+              isVisible: row.is_visible,
+              sizes: [],
+              temperatures: [],
+              ingredients: [],
+            }))
+          );
+        }
+
+        if (categoriesRes.data) {
+          setCategories(
+            categoriesRes.data.map((cat: any) => ({
+              id: cat.id,
+              name: cat.name,
+            }))
+          );
+        }
+
+        if (paymentRes.data) {
+          setPaymentMethods(
+            paymentRes.data.map((pm: any) => ({
+              id: pm.id,
+              name: pm.name,
+              isEnabled: pm.is_enabled,
+            }))
+          );
+        }
+
+        if (sizesRes.data) {
+          setSizes(
+            sizesRes.data.map((size: any) => ({
+              id: size.id,
+              name: size.name,
+            }))
+          );
+        }
+
+        if (tempsRes.data) {
+          setTemperatures(
+            tempsRes.data.map((temp: any) => ({
+              id: temp.id,
+              name: temp.name,
+            }))
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, []);
 
   // Filter & Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +164,12 @@ export default function POSSettingsPage() {
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
+      {loading ? (
+        <div className="flex items-center justify-center h-full min-h-[400px]">
+          <p className="text-muted-foreground text-sm">Loading products...</p>
+        </div>
+      ) : (
+      <>
       {/* Header */}
       <div className="flex flex-col gap-6 mb-8">
         <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b border-[#C2456A]/10">
@@ -259,6 +351,8 @@ export default function POSSettingsPage() {
         temperatures={temperatures}
         setTemperatures={setTemperatures}
       />
+      </>
+      )}
     </div>
   );
 }
