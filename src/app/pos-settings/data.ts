@@ -71,7 +71,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-16'],
     temperatures: ['temp-hot'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1559525839-b184a4d698c7?q=80&w=300&auto=format&fit=crop'
   },
@@ -83,7 +83,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1551030173-122aabc4489c?q=80&w=300&auto=format&fit=crop'
   },
@@ -95,7 +95,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=300&auto=format&fit=crop'
   },
@@ -107,7 +107,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1570968915860-54d5c301fa9f?q=80&w=300&auto=format&fit=crop'
   },
@@ -119,7 +119,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1534778101976-62847782c213?q=80&w=300&auto=format&fit=crop'
   },
@@ -131,7 +131,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=300&auto=format&fit=crop'
   },
@@ -145,7 +145,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?q=80&w=300&auto=format&fit=crop'
   },
@@ -157,7 +157,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1515823064-d6e0c04616a7?q=80&w=300&auto=format&fit=crop'
   },
@@ -171,7 +171,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-12', 'size-16'],
     temperatures: ['temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=300&auto=format&fit=crop'
   },
@@ -185,7 +185,7 @@ export const initialProducts: Product[] = [
     sizes: ['size-16'], // Only one size
     temperatures: ['temp-hot', 'temp-cold'],
     hasRecipe: true,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?q=80&w=300&auto=format&fit=crop'
   },
@@ -199,7 +199,7 @@ export const initialProducts: Product[] = [
     sizes: [],
     temperatures: [],
     hasRecipe: false,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?q=80&w=300&auto=format&fit=crop'
   },
@@ -211,7 +211,7 @@ export const initialProducts: Product[] = [
     sizes: [],
     temperatures: [],
     hasRecipe: false,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1509365465985-25d11c17e812?q=80&w=300&auto=format&fit=crop'
   },
@@ -223,7 +223,7 @@ export const initialProducts: Product[] = [
     sizes: [],
     temperatures: [],
     hasRecipe: false,
-    ingredients: [],
+    recipes: {},
     isVisible: true,
     image: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=300&auto=format&fit=crop'
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -48,10 +48,31 @@ export function ProductModal({
   const [step, setStep] = useState(0);
   const [editedProduct, setEditedProduct] = useState<Product | null>(null);
   const [ingredientSearch, setIngredientSearch] = useState('');
+  const [selectedRecipeSizeId, setSelectedRecipeSizeId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setEditedProduct(prev => prev ? { ...prev, image: url } : prev);
+    }
+  };
+
+  useEffect(() => {
+    if (step === 2 && editedProduct) {
+      if (editedProduct.sizes.length > 0 && (!selectedRecipeSizeId || !editedProduct.sizes.includes(selectedRecipeSizeId))) {
+        setSelectedRecipeSizeId(editedProduct.sizes[0]);
+      } else if (editedProduct.sizes.length === 0) {
+        setSelectedRecipeSizeId(null);
+      }
+    }
+  }, [step, editedProduct?.sizes, selectedRecipeSizeId]);
 
   useEffect(() => {
     if (open) {
       setStep(0);
+      setSelectedRecipeSizeId(null);
       if (product) {
         setEditedProduct({ ...product });
       } else {
@@ -63,7 +84,7 @@ export function ProductModal({
           sizes: [],
           temperatures: [],
           hasRecipe: false,
-          ingredients: [],
+          recipes: {},
           isVisible: true,
         });
       }
@@ -98,37 +119,58 @@ export function ProductModal({
   };
 
   const handleAddIngredient = (ingredientId: string) => {
+    if (!selectedRecipeSizeId) return;
     setEditedProduct(prev => {
       if (!prev) return prev;
-      if (prev.ingredients.some(i => i.ingredientId === ingredientId)) return prev;
+      const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
+      if (currentRecipe.some(i => i.ingredientId === ingredientId)) return prev;
+      
+      const newRecipes = {
+        ...prev.recipes,
+        [selectedRecipeSizeId]: [...currentRecipe, { ingredientId, quantity: '1', unit: 'g' }]
+      };
+      
       return {
         ...prev,
-        ingredients: [...prev.ingredients, { ingredientId, quantity: '1', unit: 'g' }],
-        hasRecipe: true
+        recipes: newRecipes,
+        hasRecipe: Object.values(newRecipes).some(r => r.length > 0)
       };
     });
   };
 
   const handleRemoveIngredient = (ingredientId: string) => {
+    if (!selectedRecipeSizeId) return;
     setEditedProduct(prev => {
       if (!prev) return prev;
-      const newIngredients = prev.ingredients.filter(i => i.ingredientId !== ingredientId);
+      const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
+      const newRecipe = currentRecipe.filter(i => i.ingredientId !== ingredientId);
+      
+      const newRecipes = {
+        ...prev.recipes,
+        [selectedRecipeSizeId]: newRecipe
+      };
+
       return {
         ...prev,
-        ingredients: newIngredients,
-        hasRecipe: newIngredients.length > 0
+        recipes: newRecipes,
+        hasRecipe: Object.values(newRecipes).some(r => r.length > 0)
       };
     });
   };
 
   const updateIngredient = (ingredientId: string, field: 'quantity' | 'unit', value: string) => {
+    if (!selectedRecipeSizeId) return;
     setEditedProduct(prev => {
       if (!prev) return prev;
+      const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
       return {
         ...prev,
-        ingredients: prev.ingredients.map(i => 
-          i.ingredientId === ingredientId ? { ...i, [field]: value } : i
-        )
+        recipes: {
+          ...prev.recipes,
+          [selectedRecipeSizeId]: currentRecipe.map(i => 
+            i.ingredientId === ingredientId ? { ...i, [field]: value } : i
+          )
+        }
       };
     });
   };
@@ -184,14 +226,37 @@ export function ProductModal({
             <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
               <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <Label className="mb-3 block font-semibold text-[#3a2b27]">Product Image</Label>
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 hover:border-[#C2456A]/30 transition-all cursor-pointer group">
-                  <div className="p-4 rounded-2xl bg-gray-100 text-gray-400 group-hover:text-[#C2456A] group-hover:bg-[#C2456A]/10 transition-colors">
-                    <ImagePlus className="w-8 h-8" />
-                  </div>
-                  <div className="text-sm text-center text-gray-500">
-                    <span className="text-[#C2456A] font-semibold">Click to upload</span> or drag and drop
-                  </div>
-                  <div className="text-xs text-gray-400">PNG, JPG up to 5MB</div>
+                <div 
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 hover:border-[#C2456A]/30 transition-all cursor-pointer group relative overflow-hidden min-h-[200px]"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/png, image/jpeg, image/webp" 
+                    onChange={handleImageUpload} 
+                  />
+                  {editedProduct.image ? (
+                    <div className="absolute inset-0 w-full h-full">
+                      <img src={editedProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-sm font-semibold flex items-center gap-2">
+                          <ImagePlus className="w-4 h-4" /> Change Image
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="p-4 rounded-2xl bg-gray-100 text-gray-400 group-hover:text-[#C2456A] group-hover:bg-[#C2456A]/10 transition-colors">
+                        <ImagePlus className="w-8 h-8" />
+                      </div>
+                      <div className="text-sm text-center text-gray-500">
+                        <span className="text-[#C2456A] font-semibold">Click to upload</span> or drag and drop
+                      </div>
+                      <div className="text-xs text-gray-400">PNG, JPG up to 5MB</div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -351,6 +416,26 @@ export function ProductModal({
               <div className="flex gap-5 flex-1 min-h-0">
                 {/* Left panel: Search ingredients */}
                 <div className="w-1/2 flex flex-col border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                  {editedProduct.sizes.length > 0 && (
+                    <div className="px-3 py-2 border-b border-gray-100 bg-gray-50 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {editedProduct.sizes.map(sizeId => {
+                        const size = sizes.find(s => s.id === sizeId);
+                        return (
+                          <button
+                            key={sizeId}
+                            onClick={() => setSelectedRecipeSizeId(sizeId)}
+                            className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                              selectedRecipeSizeId === sizeId
+                                ? 'bg-[#C2456A] text-white shadow-sm'
+                                : 'bg-white text-gray-500 border border-gray-200 hover:text-[#3a2b27]'
+                            }`}
+                          >
+                            {size?.name || sizeId}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="p-3 border-b border-gray-100 bg-gray-50/80">
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -366,7 +451,8 @@ export function ProductModal({
                     {filteredIngredients.length > 0 ? (
                       <div className="divide-y divide-gray-50">
                         {filteredIngredients.map(ing => {
-                          const isAdded = editedProduct.ingredients.some(i => i.ingredientId === ing.id);
+                          const currentRecipe = selectedRecipeSizeId ? (editedProduct.recipes[selectedRecipeSizeId] || []) : [];
+                          const isAdded = currentRecipe.some(i => i.ingredientId === ing.id);
                           return (
                             <div key={ing.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors">
                               <span className="text-sm font-medium text-[#3a2b27]">{ing.name}</span>
@@ -393,12 +479,21 @@ export function ProductModal({
                 {/* Right panel: Selected ingredients */}
                 <div className="w-1/2 flex flex-col border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
                   <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80 flex items-center justify-between">
-                    <h4 className="font-semibold text-sm text-[#3a2b27]">Selected ({editedProduct.ingredients.length})</h4>
+                    <h4 className="font-semibold text-sm text-[#3a2b27]">
+                      Selected ({selectedRecipeSizeId ? (editedProduct.recipes[selectedRecipeSizeId] || []).length : 0})
+                    </h4>
+                    {editedProduct.sizes.length === 0 && (
+                      <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-0.5 rounded border border-red-100">No sizes selected</span>
+                    )}
                   </div>
                   <div className="flex-1 overflow-y-auto p-3">
-                    {editedProduct.ingredients.length > 0 ? (
+                    {!selectedRecipeSizeId ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                        <p className="text-sm font-medium text-gray-400">Please select sizes in the Variants step first.</p>
+                      </div>
+                    ) : (editedProduct.recipes[selectedRecipeSizeId] || []).length > 0 ? (
                       <div className="space-y-2.5">
-                        {editedProduct.ingredients.map(ing => {
+                        {(editedProduct.recipes[selectedRecipeSizeId] || []).map(ing => {
                           const ingredientDetails = ingredientsList.find(i => i.id === ing.ingredientId);
                           return (
                             <div key={ing.ingredientId} className="p-3 border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors">
@@ -475,11 +570,26 @@ export function ProductModal({
                         editedProduct.type === 'Beverage' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
                       }`}>{editedProduct.type}</span>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Recipe</span>
-                      <span className={`font-semibold ${editedProduct.ingredients.length > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
-                        {editedProduct.ingredients.length > 0 ? `${editedProduct.ingredients.length} ingredients` : 'Not configured'}
-                      </span>
+                    <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Recipe Status</span>
+                      {editedProduct.sizes.length === 0 ? (
+                        <span className="font-semibold text-gray-400 text-sm">No sizes selected</span>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {editedProduct.sizes.map(sizeId => {
+                            const size = sizes.find(s => s.id === sizeId);
+                            const hasRecipe = (editedProduct.recipes[sizeId] || []).length > 0;
+                            return (
+                              <div key={sizeId} className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1">
+                                <span className="font-medium text-[#3a2b27]">{size?.name || sizeId}</span>
+                                <span className={`font-semibold text-xs ${hasRecipe ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                  {hasRecipe ? 'Configured' : 'Not configured'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
 
