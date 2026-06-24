@@ -1,10 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  initialCategories, 
-  initialUnits, 
-  initialInventoryItems, 
   initialTransactions,
   InventoryItem,
   Category,
@@ -12,6 +9,7 @@ import {
   InventoryTransaction,
   getInventoryStatus
 } from './data';
+import { createClient } from '@/app/lib/supabase/client';
 import { InventoryCard } from './components/inventory-card';
 import { IngredientModal } from './components/ingredient-modal';
 import { ReplenishModal } from './components/replenish-modal';
@@ -27,9 +25,10 @@ import {
 
 export default function InventoryPage() {
   // State
-  const [items, setItems] = useState<InventoryItem[]>(initialInventoryItems);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [units, setUnits] = useState<Unit[]>(initialUnits);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(initialTransactions);
 
   // View state
@@ -47,6 +46,58 @@ export default function InventoryPage() {
   const [replenishItem, setReplenishItem] = useState<InventoryItem | null>(null);
   
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  // Fetch inventory items, categories, and units from Supabase
+  useEffect(() => {
+    const supabase = createClient();
+
+    // Fetch inventory items
+    supabase
+      .from('inventory_items')
+      .select('*')
+      .then(({ data, error }) => {
+        console.log('Successfully fetched the table data', 'error:', error);
+        if (!error && data) {
+          const mapped: InventoryItem[] = data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            categoryId: row.category_id,
+            unit: row.unit,
+            currentStock: row.current_stock,
+            maxCapacity: row.max_capacity,
+            lowStockThreshold: row.low_stock_threshold,
+            imageUrl: row.image_url,
+            notes: row.notes,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
+          setItems(mapped);
+        }
+        setLoading(false);
+      });
+
+    // Fetch categories
+    supabase
+      .from('inventory_categories')
+      .select('id, name')
+      .order('name')
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setCategories(data.map((row) => ({ id: row.id, name: row.name })));
+        }
+      });
+
+    // Fetch units from inventory_units table
+    supabase
+      .from('inventory_units')
+      .select('name')
+      .order('name')
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setUnits(data.map((row) => row.name as Unit));
+        }
+      });
+  }, []);
 
   // Derived data
   const filteredItems = useMemo(() => {
@@ -76,23 +127,97 @@ export default function InventoryPage() {
     setModalOpen(true);
   };
 
-  const handleSaveIngredient = (ingredientData: Partial<InventoryItem>) => {
+  const handleSaveIngredient = async (ingredientData: Partial<InventoryItem>) => {
     if (selectedItem) {
       // Edit
-      setItems(prev => prev.map(i => i.id === selectedItem.id ? { ...i, ...ingredientData } as InventoryItem : i));
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .update({
+          name: ingredientData.name,
+          category_id: ingredientData.categoryId,
+          unit: ingredientData.unit,
+          current_stock: ingredientData.currentStock,
+          max_capacity: ingredientData.maxCapacity,
+          low_stock_threshold: ingredientData.lowStockThreshold,
+          image_url: ingredientData.imageUrl ?? null,
+          notes: ingredientData.notes ?? null,
+        })
+        .eq('id', selectedItem.id)
+        .select()
+        .single();
+
+      if (error) {
+        alert(`Failed to update ingredient: ${error.message}`);
+        return;
+      }
+
+      const updatedItem: InventoryItem = {
+        id: data.id,
+        name: data.name,
+        categoryId: data.category_id,
+        unit: data.unit,
+        currentStock: data.current_stock,
+        maxCapacity: data.max_capacity,
+        lowStockThreshold: data.low_stock_threshold,
+        imageUrl: data.image_url,
+        notes: data.notes,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+      setItems(prev => prev.map(i => i.id === selectedItem.id ? updatedItem : i));
     } else {
       // Create
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert({
+          name: ingredientData.name,
+          category_id: ingredientData.categoryId,
+          unit: ingredientData.unit,
+          current_stock: ingredientData.currentStock,
+          max_capacity: ingredientData.maxCapacity,
+          low_stock_threshold: ingredientData.lowStockThreshold,
+          image_url: ingredientData.imageUrl ?? null,
+          notes: ingredientData.notes ?? null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        alert(`Failed to save ingredient: ${error.message}`);
+        return;
+      }
+
       const newItem: InventoryItem = {
-        ...(ingredientData as InventoryItem),
-        id: `inv-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        id: data.id,
+        name: data.name,
+        categoryId: data.category_id,
+        unit: data.unit,
+        currentStock: data.current_stock,
+        maxCapacity: data.max_capacity,
+        lowStockThreshold: data.low_stock_threshold,
+        imageUrl: data.image_url,
+        notes: data.notes,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
       };
       setItems(prev => [...prev, newItem]);
     }
   };
 
-  const handleDeleteIngredient = (id: string) => {
+  const handleDeleteIngredient = async (id: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('inventory_items')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert(`Failed to delete ingredient: ${error.message}`);
+      return;
+    }
+
     setItems(prev => prev.filter(i => i.id !== id));
   };
 
@@ -102,22 +227,57 @@ export default function InventoryPage() {
     setReplenishModalOpen(true);
   };
 
-  const handleSaveReplenishment = (transactionData: Partial<InventoryTransaction>) => {
+  // TODO: include userId in the transaction data.
+  const handleSaveReplenishment = async (transactionData: Partial<InventoryTransaction>) => {
+    const supabase = createClient();
+
+    // INSERT into inventory_transactions
+    const { data: txnData, error: txnError } = await supabase
+      .from('inventory_transactions')
+      .insert({
+        inventory_item_id: transactionData.ingredientId,
+        type: transactionData.type,
+        previous_stock: transactionData.previousStock,
+        quantity_changed: transactionData.quantityChanged,
+        new_stock: transactionData.newStock,
+        notes: transactionData.notes ?? null,
+        delivery_cost: transactionData.expenseDetails?.deliveryCost ?? null,
+        expense_payment_method: transactionData.expenseDetails?.paymentMethod ?? null,
+        supplier: transactionData.expenseDetails?.supplier ?? null,
+        received_by: transactionData.expenseDetails?.receivedBy ?? null,
+        delivery_date: transactionData.expenseDetails?.deliveryDate ?? null,
+        delivery_time: transactionData.expenseDetails?.deliveryTime ?? null,
+      })
+      .select()
+      .single();
+
+    if (txnError) {
+      alert(`Failed to save replenishment: ${txnError.message}`);
+      return;
+    }
+
+    // UPDATE current_stock on the ingredient
+    const { error: updateError } = await supabase
+      .from('inventory_items')
+      .update({ current_stock: transactionData.newStock })
+      .eq('id', transactionData.ingredientId);
+
+    if (updateError) {
+      alert(`Stock updated in ledger but failed to update ingredient stock: ${updateError.message}`);
+      return;
+    }
+
+    // Reflect in local state
     const newTxn: InventoryTransaction = {
       ...(transactionData as InventoryTransaction),
-      id: `txn-${Date.now()}`,
+      id: txnData.id,
     };
-    
-    // Add transaction
     setTransactions(prev => [newTxn, ...prev]);
-
-    // Update stock
-    setItems(prev => prev.map(i => {
-      if (i.id === transactionData.ingredientId) {
-        return { ...i, currentStock: transactionData.newStock! };
-      }
-      return i;
-    }));
+    setItems(prev => prev.map(i =>
+      i.id === transactionData.ingredientId
+        ? { ...i, currentStock: transactionData.newStock! }
+        : i
+    ));
   };
 
   // Handlers for Settings
@@ -138,13 +298,30 @@ export default function InventoryPage() {
     if (categoryFilter === id) setCategoryFilter('all');
   };
 
-  const handleAddUnit = (unit: string) => {
+  const handleAddUnit = async (unit: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('inventory_units')
+      .insert({ name: unit });
+    if (error) {
+      alert(`Failed to add unit: ${error.message}`);
+      return;
+    }
     setUnits(prev => [...prev, unit as Unit]);
   };
 
-  const handleDeleteUnit = (unit: string) => {
+  const handleDeleteUnit = async (unit: string) => {
     if (items.some(i => i.unit === unit)) {
       alert('Cannot delete unit: Ingredients are currently using it.');
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('inventory_units')
+      .delete()
+      .eq('name', unit);
+    if (error) {
+      alert(`Failed to delete unit: ${error.message}`);
       return;
     }
     setUnits(prev => prev.filter(u => u !== unit));
@@ -183,6 +360,14 @@ export default function InventoryPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8 items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading inventory...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
