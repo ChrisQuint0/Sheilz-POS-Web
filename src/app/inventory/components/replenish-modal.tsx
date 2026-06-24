@@ -21,6 +21,7 @@ interface ReplenishModalProps {
   onSave: (transaction: Partial<InventoryTransaction>) => void;
 }
 
+// TODO: fetch payment methods from the 'payment_methods' table in Supabase
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit Card'];
 
 export function ReplenishModal({ open, onOpenChange, item, onSave }: ReplenishModalProps) {
