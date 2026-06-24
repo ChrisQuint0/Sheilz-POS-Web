@@ -281,17 +281,45 @@ export default function InventoryPage() {
   };
 
   // Handlers for Settings
-  const handleAddCategory = (name: string) => {
-    setCategories(prev => [...prev, { id: `cat-${Date.now()}`, name }]);
+  const handleAddCategory = async (name: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('inventory_categories')
+      .insert({ name })
+      .select()
+      .single();
+    if (error) {
+      alert(`Failed to add category: ${error.message}`);
+      return;
+    }
+    setCategories(prev => [...prev, { id: data.id, name: data.name }]);
   };
 
-  const handleUpdateCategory = (id: string, name: string) => {
+  const handleUpdateCategory = async (id: string, name: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('inventory_categories')
+      .update({ name })
+      .eq('id', id);
+    if (error) {
+      alert(`Failed to update category: ${error.message}`);
+      return;
+    }
     setCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c));
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
     if (items.some(i => i.categoryId === id)) {
       alert('Cannot delete category: Ingredients are currently assigned to it.');
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('inventory_categories')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      alert(`Failed to delete category: ${error.message}`);
       return;
     }
     setCategories(prev => prev.filter(c => c.id !== id));
