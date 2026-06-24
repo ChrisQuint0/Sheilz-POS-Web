@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Transaction } from "../data";
 import { format } from "date-fns";
+import { useProfile } from "@/components/profile-provider";
 
 interface TransactionDrawerProps {
   transaction: Transaction | null;
@@ -25,6 +26,10 @@ interface TransactionDrawerProps {
 }
 
 export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDelete }: TransactionDrawerProps) {
+  const { profile } = useProfile();
+  const isAdmin = profile?.role === 'Administrator';
+  const isManagerOrAdmin = profile?.role === 'Manager' || profile?.role === 'Administrator';
+
   const [localStatus, setLocalStatus] = useState<string>("");
   const [localPaymentMethod, setLocalPaymentMethod] = useState<string>("");
   const [localCustomer, setLocalCustomer] = useState<string>("");
@@ -47,7 +52,7 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
     onEdit({
       ...transaction,
       status: localStatus as any,
-      paymentMethod: localPaymentMethod,
+      paymentMethod: localPaymentMethod as any,
       customerName: localCustomer
     });
   };
@@ -98,25 +103,33 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
                 
                 <div className="text-muted-foreground">Customer</div>
                 <div className="text-right">
-                  <Input 
-                    value={localCustomer} 
-                    onChange={(e) => setLocalCustomer(e.target.value)} 
-                    className="h-8 text-right text-sm"
-                  />
+                  {isManagerOrAdmin ? (
+                    <Input 
+                      value={localCustomer} 
+                      onChange={(e) => setLocalCustomer(e.target.value)} 
+                      className="h-8 text-right text-sm"
+                    />
+                  ) : (
+                    <div className="font-medium">{localCustomer}</div>
+                  )}
                 </div>
                 
                 <div className="text-muted-foreground">Status</div>
                 <div className="text-right">
-                   <Select value={localStatus} onValueChange={setLocalStatus}>
-                     <SelectTrigger className="h-8 text-sm">
-                       <SelectValue />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="Completed">Completed</SelectItem>
-                       <SelectItem value="Void (Not Made)">Void (Not Made)</SelectItem>
-                       <SelectItem value="Void (Consumed)">Void (Consumed)</SelectItem>
-                     </SelectContent>
-                   </Select>
+                   {isManagerOrAdmin ? (
+                     <Select value={localStatus} onValueChange={(val) => setLocalStatus(val as any)}>
+                       <SelectTrigger className="h-8 text-sm">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="Completed">Completed</SelectItem>
+                         <SelectItem value="Void (Not Made)">Void (Not Made)</SelectItem>
+                         <SelectItem value="Void (Consumed)">Void (Consumed)</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   ) : (
+                     <div className="font-medium">{localStatus}</div>
+                   )}
                 </div>
                 
                 <div className="text-muted-foreground">Cashier</div>
@@ -124,17 +137,21 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
                 
                 <div className="text-muted-foreground">Payment Method</div>
                 <div className="text-right">
-                   <Select value={localPaymentMethod} onValueChange={setLocalPaymentMethod}>
-                     <SelectTrigger className="h-8 text-sm">
-                       <SelectValue />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="Cash">Cash</SelectItem>
-                       <SelectItem value="GCash">GCash</SelectItem>
-                       <SelectItem value="BPI">BPI</SelectItem>
-                       <SelectItem value="Maya">Maya</SelectItem>
-                     </SelectContent>
-                   </Select>
+                   {isManagerOrAdmin ? (
+                     <Select value={localPaymentMethod} onValueChange={(val) => setLocalPaymentMethod(val as any)}>
+                       <SelectTrigger className="h-8 text-sm">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="Cash">Cash</SelectItem>
+                         <SelectItem value="GCash">GCash</SelectItem>
+                         <SelectItem value="BPI">BPI</SelectItem>
+                         <SelectItem value="Maya">Maya</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   ) : (
+                     <div className="font-medium">{localPaymentMethod}</div>
+                   )}
                 </div>
               </div>
             </section>
@@ -216,15 +233,21 @@ export function TransactionDrawer({ transaction, isOpen, onClose, onEdit, onDele
 
         <SheetFooter className="p-6 pt-0 border-t mt-auto flex flex-col gap-2 sm:flex-col sm:space-x-0">
             <div className="flex w-full gap-2 pt-4">
-              <Button variant="outline" className="flex-1" onClick={handleDiscard} disabled={!isDirty}>
-                Discard
-              </Button>
-              <Button variant="default" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSaveChanges} disabled={!isDirty}>
-                Save Changes
-              </Button>
-              <Button variant="destructive" className="flex-1" onClick={() => onDelete(transaction)}>
-                Delete
-              </Button>
+              {isManagerOrAdmin && (
+                <>
+                  <Button variant="outline" className="flex-1" onClick={handleDiscard} disabled={!isDirty}>
+                    Discard
+                  </Button>
+                  <Button variant="default" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSaveChanges} disabled={!isDirty}>
+                    Save Changes
+                  </Button>
+                </>
+              )}
+              {isAdmin && (
+                <Button variant="destructive" className="flex-1" onClick={() => onDelete(transaction)}>
+                  Delete
+                </Button>
+              )}
             </div>
         </SheetFooter>
       </SheetContent>

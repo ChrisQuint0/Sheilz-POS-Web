@@ -200,7 +200,7 @@ export function ReplenishModal({ open, onOpenChange, item, onSave }: ReplenishMo
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[13px] font-semibold text-[#3a2b27]">Payment Method</Label>
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <Select value={paymentMethod} onValueChange={(val) => setPaymentMethod(val as any)}>
                     <SelectTrigger className="h-10 bg-white border-gray-200">
                       <SelectValue placeholder="Select Method" />
                     </SelectTrigger>

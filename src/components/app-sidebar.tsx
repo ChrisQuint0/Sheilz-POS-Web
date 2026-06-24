@@ -13,6 +13,7 @@ import {
   User2,
   ChevronsUpDown,
   PanelRight,
+  LogOut,
 } from "lucide-react"
 
 import {
@@ -29,9 +30,20 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuGroup,
+} from "@/components/ui/dropdown-menu"
+
 import Image from "next/image"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useProfile } from "@/components/profile-provider"
 
 const navItems = [
   {
@@ -74,6 +86,27 @@ const navItems = [
 export function AppSidebar() {
   const { toggleSidebar, state } = useSidebar()
   const pathname = usePathname()
+  const { profile, loading, signOut } = useProfile()
+
+  // Display name and email — use profile data when available, fallback to skeleton-like defaults
+  const displayName = profile?.display_name ?? "Loading..."
+  const displayEmail = profile?.email ?? ""
+  const displayRole = profile?.role ?? ""
+
+  // Filter navigation items based on user role
+  const role = profile?.role ?? "Cashier"
+  const filteredNavItems = navItems.filter(item => {
+    if (role === "Administrator") return true; // Admins see everything
+    if (role === "Manager") {
+      // Managers see these specific pages
+      return ["Dashboard", "Sales History", "Inventory", "Team", "Analytics"].includes(item.title);
+    }
+    if (role === "Cashier") {
+      // Cashiers only see the dashboard and sales history (for current day viewing)
+      return ["Dashboard", "Sales History"].includes(item.title);
+    }
+    return false;
+  });
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar shadow-sm">
@@ -90,27 +123,25 @@ export function AppSidebar() {
                  src="/sheilz_pos_logo.png" 
                  alt="Sheilz Coffee Logo" 
                  fill 
-                 sizes="48px"
-                 className={cn("object-contain transition-opacity", state === "collapsed" && "group-hover/logo:opacity-0")} 
+                 className="object-cover"
                />
-               {state === "collapsed" && (
-                 <PanelRight className="absolute size-5 opacity-0 transition-opacity group-hover/logo:opacity-100 text-sidebar-foreground" />
-               )}
             </div>
-            <div className="flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-              <span className="truncate font-sans font-semibold text-lg text-foreground tracking-tight">Sheilz Coffee</span>
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-bold tracking-tight text-lg text-sidebar-foreground">Sheilz Coffee</span>
+              <span className="truncate text-xs font-medium text-sidebar-foreground/60">POS System</span>
             </div>
           </div>
-          <SidebarTrigger className="group-data-[collapsible=icon]:hidden ml-auto" />
+          
+          <SidebarTrigger className="group-data-[collapsible=icon]:hidden shrink-0" />
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-2 mt-2">
-              {navItems.map((item) => {
-                const isActive = pathname === item.url || (item.url !== "/" && pathname.startsWith(item.url))
+            <SidebarMenu className="gap-1.5">
+              {filteredNavItems.map((item) => {
+                const isActive = pathname === item.url || pathname.startsWith(item.url + "/")
                 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -134,16 +165,70 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-sidebar-accent/20">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0">
-                <User2 className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium text-sidebar-foreground">Admin User</span>
-                <span className="truncate text-xs text-sidebar-foreground/70">admin@sheilz.com</span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4" />
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-sidebar-accent/20" />}>
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0">
+                    {profile?.avatar_url ? (
+                      <Image
+                        src={profile.avatar_url}
+                        alt={displayName}
+                        width={32}
+                        height={32}
+                        className="rounded-lg object-cover"
+                      />
+                    ) : (
+                      <User2 className="size-4" />
+                    )}
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium text-sidebar-foreground">
+                      {loading ? "Loading..." : displayName}
+                    </span>
+                    <span className="truncate text-xs text-sidebar-foreground/70">
+                      {loading ? "" : displayEmail}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="top"
+                align="start"
+                sideOffset={4}
+              >
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="p-0 font-normal">
+                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                      <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0">
+                        {profile?.avatar_url ? (
+                          <Image
+                            src={profile.avatar_url}
+                            alt={displayName}
+                            width={32}
+                            height={32}
+                            className="rounded-lg object-cover"
+                          />
+                        ) : (
+                          <User2 className="size-4" />
+                        )}
+                      </div>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{displayName}</span>
+                        <span className="truncate text-xs text-muted-foreground">{displayRole}</span>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={signOut}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                >
+                  <LogOut className="mr-2 size-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

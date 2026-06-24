@@ -203,7 +203,7 @@ export default function AuditPage() {
               <Filter className="h-3 w-3" /> Filters:
             </div>
             
-            <Select value={userFilter} onValueChange={setUserFilter}>
+            <Select value={userFilter} onValueChange={(val) => setUserFilter(val ?? 'All')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="User" />
               </SelectTrigger>
@@ -213,7 +213,7 @@ export default function AuditPage() {
               </SelectContent>
             </Select>
 
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val ?? 'All')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
@@ -223,7 +223,7 @@ export default function AuditPage() {
               </SelectContent>
             </Select>
 
-            <Select value={actionFilter} onValueChange={setActionFilter}>
+            <Select value={actionFilter} onValueChange={(val) => setActionFilter(val ?? 'All')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Action Type" />
               </SelectTrigger>
@@ -233,7 +233,7 @@ export default function AuditPage() {
               </SelectContent>
             </Select>
 
-            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+            <Select value={severityFilter} onValueChange={(val) => setSeverityFilter(val ?? 'All')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>

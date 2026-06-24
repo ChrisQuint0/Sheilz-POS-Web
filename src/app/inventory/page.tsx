@@ -14,6 +14,7 @@ import { InventoryCard } from './components/inventory-card';
 import { IngredientModal } from './components/ingredient-modal';
 import { ReplenishModal } from './components/replenish-modal';
 import { SettingsModal } from './components/settings-modal';
+import { useProfile } from '@/components/profile-provider';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,9 @@ import {
 } from 'lucide-react';
 
 export default function InventoryPage() {
+  const { profile } = useProfile();
+  const isManagerOrAdmin = profile?.role === 'Manager' || profile?.role === 'Administrator';
+
   // State
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -452,21 +456,25 @@ export default function InventoryPage() {
                   <ClipboardList className="w-4 h-4 mr-2" />
                   Transactions
                 </Button>
-                <Button 
-                  variant="outline"
-                  className="h-9 bg-white border-gray-200 text-sm"
-                  onClick={() => setSettingsModalOpen(true)}
-                >
-                  <Settings2 className="w-4 h-4 mr-2" />
-                  Settings
-                </Button>
-                <Button 
-                  className="h-9 px-5 bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm text-sm"
-                  onClick={handleOpenCreateModal}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Ingredient
-                </Button>
+                {isManagerOrAdmin && (
+                  <>
+                    <Button 
+                      variant="outline"
+                      className="h-9 bg-white border-gray-200 text-sm"
+                      onClick={() => setSettingsModalOpen(true)}
+                    >
+                      <Settings2 className="w-4 h-4 mr-2" />
+                      Settings
+                    </Button>
+                    <Button 
+                      className="h-9 px-5 bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm text-sm"
+                      onClick={handleOpenCreateModal}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Ingredient
+                    </Button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -519,7 +527,7 @@ export default function InventoryPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val ?? 'all')}>
                 <SelectTrigger className="w-full sm:w-44 h-9 text-sm bg-white border-gray-200">
                   <SelectValue>
                     {categoryFilter === 'all' 

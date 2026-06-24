@@ -3,6 +3,7 @@ import { InventoryItem, Category, getInventoryStatus } from '../data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, AlertCircle, AlertTriangle, CheckCircle2, Pencil, RefreshCw } from 'lucide-react';
+import { useProfile } from '@/components/profile-provider';
 
 interface InventoryCardProps {
   item: InventoryItem;
@@ -12,6 +13,9 @@ interface InventoryCardProps {
 }
 
 export function InventoryCard({ item, category, onClick, onReplenish }: InventoryCardProps) {
+  const { profile } = useProfile();
+  const isManagerOrAdmin = profile?.role === 'Manager' || profile?.role === 'Administrator';
+
   const status = getInventoryStatus(item);
   
   // Calculate percentage safely
@@ -122,19 +126,21 @@ export function InventoryCard({ item, category, onClick, onReplenish }: Inventor
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2.5 bg-gray-50/80 border-t border-gray-100 flex justify-end">
-        <Button 
-          size="sm" 
-          className="h-7 px-3 text-[11px] font-semibold bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onReplenish(e);
-          }}
-        >
-          <RefreshCw className="w-3 h-3 mr-1.5" />
-          Replenish
-        </Button>
-      </div>
+      {isManagerOrAdmin && (
+        <div className="px-4 py-2.5 bg-gray-50/80 border-t border-gray-100 flex justify-end">
+          <Button 
+            size="sm" 
+            className="h-7 px-3 text-[11px] font-semibold bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReplenish(e);
+            }}
+          >
+            <RefreshCw className="w-3 h-3 mr-1.5" />
+            Replenish
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,24 +3,40 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/app/lib/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Mock login delay
-    setTimeout(() => {
+    setError(null);
+
+    const supabase = createClient();
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      setError(signInError.message);
       setIsLoading(false);
-      router.push('/dashboard');
-    }, 1000);
+      return;
+    }
+
+    // Success — push to dashboard and refresh to let middleware pick up cookies
+    router.push('/dashboard');
+    router.refresh();
   };
 
   return (
@@ -51,6 +67,14 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Error message */}
+        {error && (
+          <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
@@ -62,6 +86,8 @@ export default function LoginPage() {
                 type="email" 
                 placeholder="admin@sheilz.com" 
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 h-11 bg-gray-50/50 border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20 transition-colors"
               />
             </div>
@@ -76,6 +102,8 @@ export default function LoginPage() {
                 type="password" 
                 placeholder="••••••••" 
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="pl-10 h-11 bg-gray-50/50 border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20 transition-colors"
               />
             </div>

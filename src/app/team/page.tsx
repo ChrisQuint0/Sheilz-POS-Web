@@ -13,8 +13,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Plus, Upload } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useProfile } from "@/components/profile-provider"
 
 export default function TeamPage() {
+  const { profile } = useProfile()
+  const isAdmin = profile?.role === 'Administrator'
+
   const [users, setUsers] = useState<User[]>(MOCK_USERS)
   
   // Filters
@@ -71,16 +75,18 @@ export default function TeamPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Team</h1>
           <p className="text-sm text-muted-foreground">Manage staff accounts, permissions, and system access.</p>
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsImportModalOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import Users
-          </Button>
-          <Button className="w-full md:w-auto" onClick={() => setIsAddModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsImportModalOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import Users
+            </Button>
+            <Button className="w-full md:w-auto" onClick={() => setIsAddModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filters Toolbar */}
@@ -128,11 +134,13 @@ export default function TeamPage() {
         {filteredUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center border rounded-lg border-dashed p-8">
             <h3 className="text-lg font-medium text-foreground">No team members found</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">Create your first staff account to get started.</p>
-            <Button onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
+            <p className="text-sm text-muted-foreground mt-1 mb-4">{isAdmin ? 'Create your first staff account to get started.' : 'No team members match your filters.'}</p>
+            {isAdmin && (
+              <Button onClick={() => setIsAddModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            )}
           </div>
         ) : (
           <>

@@ -37,7 +37,7 @@ export function AuthorizationModal({ isOpen, onClose, onAuthorize, actionType }:
             <AlertTriangle className="h-5 w-5" />
             {isDelete ? "Authorize Deletion" : "Authorize Edit"}
           </DialogTitle>
-          <DialogDescription className="pt-2 text-sm text-muted-foreground space-y-2" asChild>
+          <DialogDescription className="pt-2 text-sm text-muted-foreground space-y-2">
             <div className="space-y-2">
               {isDelete ? (
                 <>

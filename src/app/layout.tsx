@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { ProfileProvider } from "@/components/profile-provider";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -25,9 +26,11 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <TooltipProvider>
-          <DashboardLayout>{children}</DashboardLayout>
-        </TooltipProvider>
+        <ProfileProvider>
+          <TooltipProvider>
+            <DashboardLayout>{children}</DashboardLayout>
+          </TooltipProvider>
+        </ProfileProvider>
       </body>
     </html>
   );

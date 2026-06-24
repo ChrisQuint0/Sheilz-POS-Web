@@ -22,8 +22,12 @@ import { TransactionDrawer } from "./components/transaction-drawer";
 import { MobileTransactionCard } from "./components/mobile-transaction-card";
 import { format } from "date-fns";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useProfile } from "@/components/profile-provider";
 
 export default function SalesHistoryPage() {
+  const { profile } = useProfile();
+  const isAdmin = profile?.role === 'Administrator';
+
   const [rowData, setRowData] = useState<Transaction[]>(initialTransactions);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [selectedRows, setSelectedRows] = useState<Transaction[]>([]);
@@ -233,9 +237,9 @@ export default function SalesHistoryPage() {
       minWidth: 140 
     },
     { field: "cashier", headerName: "Cashier", minWidth: 150 },
-    {
+    ...(isAdmin ? [{
       headerName: "Actions",
-      pinned: "right",
+      pinned: "right" as const,
       width: 100,
       minWidth: 100,
       maxWidth: 100,
@@ -258,8 +262,8 @@ export default function SalesHistoryPage() {
           </div>
         );
       }
-    }
-  ], []);
+    }] : [])
+  ], [isAdmin]);
 
   const defaultColDef = useMemo<ColDef>(() => {
     return {
@@ -283,13 +287,13 @@ export default function SalesHistoryPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {selectedRows.length > 0 && isDesktop && (
+            {selectedRows.length > 0 && isDesktop && isAdmin && (
               <Button 
                 variant="destructive" 
                 onClick={() => requestDelete(selectedRows)}
                 className="animate-in fade-in"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="w-4 h-4 mr-2" />
                 Delete Selected ({selectedRows.length})
               </Button>
             )}
@@ -317,7 +321,7 @@ export default function SalesHistoryPage() {
              />
            </div>
            <div className="flex flex-wrap gap-3">
-             <Select value={statusFilter} onValueChange={setStatusFilter}>
+             <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? 'All')}>
                <SelectTrigger className="w-[140px]">
                  <SelectValue placeholder="Status" />
                </SelectTrigger>
@@ -328,7 +332,7 @@ export default function SalesHistoryPage() {
                </SelectContent>
              </Select>
 
-             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+             <Select value={paymentFilter} onValueChange={(val) => setPaymentFilter(val ?? 'All')}>
                <SelectTrigger className="w-[140px]">
                  <SelectValue placeholder="Payment" />
                </SelectTrigger>
@@ -341,7 +345,7 @@ export default function SalesHistoryPage() {
                </SelectContent>
              </Select>
 
-             <Select value={cashierFilter} onValueChange={setCashierFilter}>
+             <Select value={cashierFilter} onValueChange={(val) => setCashierFilter(val ?? 'All')}>
                <SelectTrigger className="w-[140px]">
                  <SelectValue placeholder="Cashier" />
                </SelectTrigger>
@@ -352,7 +356,7 @@ export default function SalesHistoryPage() {
                </SelectContent>
              </Select>
 
-             <Select value={dateFilter} onValueChange={setDateFilter}>
+             <Select value={dateFilter} onValueChange={(val) => setDateFilter(val ?? 'All')}>
                <SelectTrigger className="w-[140px]">
                  <SelectValue placeholder="Date" />
                </SelectTrigger>
