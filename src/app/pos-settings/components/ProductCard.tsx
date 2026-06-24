@@ -112,11 +112,18 @@ export function ProductCard({ product, category, sizes, temperatures, onClick }:
               {product.hasRecipe ? 'Recipe Ready' : 'No Recipe'}
             </span>
           </div>
-          {product.ingredients.length > 0 && (
-            <span className="text-[10px] text-gray-400 font-medium">
-              {product.ingredients.length} ingredient{product.ingredients.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          {(() => {
+            const uniqueIngredientsCount = Object.values(product.recipes || {}).reduce((acc, recipe) => {
+              recipe.forEach(ing => acc.add(ing.ingredientId));
+              return acc;
+            }, new Set<string>()).size;
+            
+            return uniqueIngredientsCount > 0 && (
+              <span className="text-[10px] text-gray-400 font-medium">
+                {uniqueIngredientsCount} ingredient{uniqueIngredientsCount !== 1 ? 's' : ''}
+              </span>
+            );
+          })()}
         </div>
       </div>
     </div>

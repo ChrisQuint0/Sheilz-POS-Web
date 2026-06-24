@@ -68,7 +68,7 @@ export default function POSSettingsPage() {
               isVisible: row.is_visible,
               sizes: [],
               temperatures: [],
-              ingredients: [],
+              recipes: {},
             }))
           );
         }

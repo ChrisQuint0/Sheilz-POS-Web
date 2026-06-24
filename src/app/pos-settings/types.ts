@@ -10,7 +10,7 @@ export interface Product {
   sizes: string[]; // size ids
   temperatures: string[]; // temp ids
   hasRecipe: boolean;
-  ingredients: { ingredientId: string; quantity: string; unit: string }[];
+  recipes: Record<string, { ingredientId: string; quantity: string; unit: string }[]>;
   isVisible: boolean;
 }
 
