@@ -9,6 +9,7 @@ export interface Product {
   description?: string;
   sizes: string[]; // size ids
   temperatures: string[]; // temp ids
+  prices: Record<string, number>;
   hasRecipe: boolean;
   recipes: Record<string, { ingredientId: string; quantity: string; unit: string }[]>;
   isVisible: boolean;

@@ -33,7 +33,7 @@ interface ProductModalProps {
   onSave: (product: Product) => void;
 }
 
-const STEPS = ['Basic Details', 'Variants', 'Recipe', 'Summary'];
+const STEPS = ['Basic Details', 'Variants', 'Pricing', 'Recipe', 'Summary'];
 
 export function ProductModal({ 
   open, 
@@ -54,13 +54,16 @@ export function ProductModal({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [pricingErrors, setPricingErrors] = useState<string[]>([]);
 
-  const recipeCombinations = React.useMemo(() => {
+  const variantCombinations = React.useMemo(() => {
     if (!editedProduct) return [];
     const sizesSelected = editedProduct.sizes;
     const tempsSelected = editedProduct.temperatures;
     
-    if (sizesSelected.length === 0 && tempsSelected.length === 0) return [];
+    if (sizesSelected.length === 0 && tempsSelected.length === 0) {
+      return [{ id: 'default', name: 'Regular' }];
+    }
     
     if (sizesSelected.length > 0 && tempsSelected.length === 0) {
       return sizesSelected.map(sId => {
@@ -99,7 +102,7 @@ export function ProductModal({
     checkScroll();
     window.addEventListener('resize', checkScroll);
     return () => window.removeEventListener('resize', checkScroll);
-  }, [step, recipeCombinations, selectedRecipeConfigId, checkScroll]);
+  }, [step, variantCombinations, selectedRecipeConfigId, checkScroll]);
 
   const scrollCombos = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -118,14 +121,14 @@ export function ProductModal({
   };
 
   useEffect(() => {
-    if (step === 2 && editedProduct) {
-      if (recipeCombinations.length > 0 && (!selectedRecipeConfigId || !recipeCombinations.some(c => c.id === selectedRecipeConfigId))) {
-        setSelectedRecipeConfigId(recipeCombinations[0].id);
-      } else if (recipeCombinations.length === 0) {
+    if (step === 3 && editedProduct) {
+      if (variantCombinations.length > 0 && (!selectedRecipeConfigId || !variantCombinations.some(c => c.id === selectedRecipeConfigId))) {
+        setSelectedRecipeConfigId(variantCombinations[0].id);
+      } else if (variantCombinations.length === 0) {
         setSelectedRecipeConfigId(null);
       }
     }
-  }, [step, recipeCombinations, selectedRecipeConfigId]);
+  }, [step, variantCombinations, selectedRecipeConfigId, editedProduct]);
 
   useEffect(() => {
     if (open) {
@@ -141,6 +144,7 @@ export function ProductModal({
           type: 'Beverage',
           sizes: [],
           temperatures: [],
+          prices: {},
           hasRecipe: false,
           recipes: {},
           isVisible: true,
@@ -153,7 +157,23 @@ export function ProductModal({
 
   const isEditing = !!product;
 
-  const nextStep = () => setStep(s => Math.min(STEPS.length - 1, s + 1));
+  const nextStep = () => {
+    if (step === 2) {
+      const errors: string[] = [];
+      for (const combo of variantCombinations) {
+        const price = editedProduct.prices?.[combo.id];
+        if (price === undefined || price === null || isNaN(price) || price < 0 || String(price).trim() === '') {
+          errors.push(combo.id);
+        }
+      }
+      if (errors.length > 0) {
+        setPricingErrors(errors);
+        return;
+      }
+      setPricingErrors([]);
+    }
+    setStep(s => Math.min(STEPS.length - 1, s + 1));
+  };
   const prevStep = () => setStep(s => Math.max(0, s - 1));
 
   const handleSizeToggle = (sizeId: string) => {
@@ -464,8 +484,58 @@ export function ProductModal({
             </div>
           )}
 
-          {/* Step 3: Recipe */}
+          {/* Step 3: Pricing */}
           {step === 2 && (
+            <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
+              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+                <div>
+                  <h3 className="font-semibold text-[#3a2b27] text-lg">Pricing Configuration</h3>
+                  <p className="text-sm text-gray-400 mt-0.5">Assign a selling price to each variant combination.</p>
+                </div>
+                <div className="space-y-3">
+                  {variantCombinations.map(combo => {
+                    const hasError = pricingErrors.includes(combo.id);
+                    return (
+                      <div key={combo.id} className="flex items-center gap-4">
+                        <Label className="w-1/2 font-medium text-sm text-[#3a2b27]">{combo.name}</Label>
+                        <div className="relative w-1/2">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">₱</span>
+                          <Input 
+                            type="number"
+                            placeholder="0.00"
+                            className={`pl-7 h-10 ${hasError ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20'}`}
+                            value={editedProduct.prices?.[combo.id] ?? ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setEditedProduct(prev => {
+                                if (!prev) return prev;
+                                const newPrices = { ...prev.prices };
+                                if (val === '') {
+                                  delete newPrices[combo.id];
+                                } else {
+                                  newPrices[combo.id] = parseFloat(val);
+                                }
+                                return { ...prev, prices: newPrices };
+                              });
+                              setPricingErrors(prev => prev.filter(id => id !== combo.id));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {pricingErrors.length > 0 && (
+                    <div className="text-red-500 text-sm font-medium mt-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                      Please enter a valid price for all combinations.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Recipe */}
+          {step === 3 && (
             <div className="space-y-4 animate-in fade-in duration-300 flex flex-col h-full min-h-[420px]">
               <div>
                 <h3 className="font-semibold text-[#3a2b27] text-lg">Recipe Configuration</h3>
@@ -475,7 +545,7 @@ export function ProductModal({
               <div className="flex gap-5 flex-1 min-h-0">
                 {/* Left panel: Search ingredients */}
                 <div className="w-1/2 flex flex-col border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                  {recipeCombinations.length > 0 && (
+                  {variantCombinations.length > 0 && (
                     <div className="relative px-3 py-2 border-b border-gray-100 bg-gray-50 flex items-center group">
                       {canScrollLeft && (
                         <button
@@ -491,7 +561,7 @@ export function ProductModal({
                         onScroll={checkScroll}
                         className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full scroll-smooth px-2"
                       >
-                        {recipeCombinations.map(combo => {
+                        {variantCombinations.map(combo => {
                           return (
                             <button
                               key={combo.id}
@@ -564,7 +634,7 @@ export function ProductModal({
                     <h4 className="font-semibold text-sm text-[#3a2b27]">
                       Selected ({selectedRecipeConfigId ? (editedProduct.recipes[selectedRecipeConfigId] || []).length : 0})
                     </h4>
-                    {recipeCombinations.length === 0 && (
+                    {variantCombinations.length === 0 && (
                       <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-0.5 rounded border border-red-100">No variants selected</span>
                     )}
                   </div>
@@ -618,8 +688,8 @@ export function ProductModal({
             </div>
           )}
 
-          {/* Step 4: Summary */}
-          {step === 3 && (
+          {/* Step 5: Summary */}
+          {step === 4 && (
             <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
               <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-[#3a2b27] mb-5">Product Summary</h3>
@@ -641,12 +711,28 @@ export function ProductModal({
                       }`}>{editedProduct.type}</span>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Pricing</span>
+                      <div className="space-y-1.5">
+                        {variantCombinations.map(combo => {
+                          const price = editedProduct.prices?.[combo.id];
+                          return (
+                            <div key={combo.id} className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1">
+                              <span className="font-medium text-[#3a2b27]">{combo.name}</span>
+                              <span className="font-semibold text-gray-700">
+                                {price !== undefined && price !== null && !isNaN(price) ? `₱${price}` : '—'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
                       <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Recipe Status</span>
-                      {recipeCombinations.length === 0 ? (
+                      {variantCombinations.length === 0 ? (
                         <span className="font-semibold text-gray-400 text-sm">No variants selected</span>
                       ) : (
                         <div className="space-y-1.5">
-                          {recipeCombinations.map(combo => {
+                          {variantCombinations.map(combo => {
                             const hasRecipe = (editedProduct.recipes[combo.id] || []).length > 0;
                             return (
                               <div key={combo.id} className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1">
