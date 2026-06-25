@@ -480,7 +480,7 @@ export function ProductModal({
                       {canScrollLeft && (
                         <button
                           onClick={() => scrollCombos('left')}
-                          className="absolute left-1 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-500 hover:text-[#C2456A] opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute left-1 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-500 hover:text-[#C2456A]"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -511,7 +511,7 @@ export function ProductModal({
                       {canScrollRight && (
                         <button
                           onClick={() => scrollCombos('right')}
-                          className="absolute right-1 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-500 hover:text-[#C2456A] opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute right-1 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-500 hover:text-[#C2456A]"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
