@@ -48,8 +48,66 @@ export function ProductModal({
   const [step, setStep] = useState(0);
   const [editedProduct, setEditedProduct] = useState<Product | null>(null);
   const [ingredientSearch, setIngredientSearch] = useState('');
-  const [selectedRecipeSizeId, setSelectedRecipeSizeId] = useState<string | null>(null);
+  const [selectedRecipeConfigId, setSelectedRecipeConfigId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const recipeCombinations = React.useMemo(() => {
+    if (!editedProduct) return [];
+    const sizesSelected = editedProduct.sizes;
+    const tempsSelected = editedProduct.temperatures;
+    
+    if (sizesSelected.length === 0 && tempsSelected.length === 0) return [];
+    
+    if (sizesSelected.length > 0 && tempsSelected.length === 0) {
+      return sizesSelected.map(sId => {
+        const sName = sizes.find(s => s.id === sId)?.name || sId;
+        return { id: sId, name: sName };
+      });
+    }
+    
+    if (sizesSelected.length === 0 && tempsSelected.length > 0) {
+      return tempsSelected.map(tId => {
+        const tName = temperatures.find(t => t.id === tId)?.name || tId;
+        return { id: tId, name: tName };
+      });
+    }
+    
+    const combos: {id: string, name: string}[] = [];
+    for (const sId of sizesSelected) {
+      for (const tId of tempsSelected) {
+        const sName = sizes.find(s => s.id === sId)?.name || sId;
+        const tName = temperatures.find(t => t.id === tId)?.name || tId;
+        combos.push({ id: `${sId}_${tId}`, name: `${sName} ${tName}` });
+      }
+    }
+    return combos;
+  }, [editedProduct?.sizes, editedProduct?.temperatures, sizes, temperatures]);
+
+  const checkScroll = React.useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [step, recipeCombinations, selectedRecipeConfigId, checkScroll]);
+
+  const scrollCombos = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const amount = 200;
+      scrollContainerRef.current.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+      setTimeout(checkScroll, 300);
+    }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,18 +119,18 @@ export function ProductModal({
 
   useEffect(() => {
     if (step === 2 && editedProduct) {
-      if (editedProduct.sizes.length > 0 && (!selectedRecipeSizeId || !editedProduct.sizes.includes(selectedRecipeSizeId))) {
-        setSelectedRecipeSizeId(editedProduct.sizes[0]);
-      } else if (editedProduct.sizes.length === 0) {
-        setSelectedRecipeSizeId(null);
+      if (recipeCombinations.length > 0 && (!selectedRecipeConfigId || !recipeCombinations.some(c => c.id === selectedRecipeConfigId))) {
+        setSelectedRecipeConfigId(recipeCombinations[0].id);
+      } else if (recipeCombinations.length === 0) {
+        setSelectedRecipeConfigId(null);
       }
     }
-  }, [step, editedProduct?.sizes, selectedRecipeSizeId]);
+  }, [step, recipeCombinations, selectedRecipeConfigId]);
 
   useEffect(() => {
     if (open) {
       setStep(0);
-      setSelectedRecipeSizeId(null);
+      setSelectedRecipeConfigId(null);
       if (product) {
         setEditedProduct({ ...product });
       } else {
@@ -119,16 +177,16 @@ export function ProductModal({
   };
 
   const handleAddIngredient = (ingredientId: string) => {
-    if (!selectedRecipeSizeId) return;
+    if (!selectedRecipeConfigId) return;
     setEditedProduct(prev => {
       if (!prev) return prev;
-      const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
+      const currentRecipe = prev.recipes[selectedRecipeConfigId] || [];
       if (currentRecipe.some(i => i.ingredientId === ingredientId)) return prev;
       
       const ingredientUnit = ingredientsList.find(i => i.id === ingredientId)?.unit ?? '';
       const newRecipes = {
         ...prev.recipes,
-        [selectedRecipeSizeId]: [...currentRecipe, { ingredientId, quantity: '1', unit: ingredientUnit }]
+        [selectedRecipeConfigId]: [...currentRecipe, { ingredientId, quantity: '1', unit: ingredientUnit }]
       };
       
       return {
@@ -140,15 +198,15 @@ export function ProductModal({
   };
 
   const handleRemoveIngredient = (ingredientId: string) => {
-    if (!selectedRecipeSizeId) return;
+    if (!selectedRecipeConfigId) return;
     setEditedProduct(prev => {
       if (!prev) return prev;
-      const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
+      const currentRecipe = prev.recipes[selectedRecipeConfigId] || [];
       const newRecipe = currentRecipe.filter(i => i.ingredientId !== ingredientId);
       
       const newRecipes = {
         ...prev.recipes,
-        [selectedRecipeSizeId]: newRecipe
+        [selectedRecipeConfigId]: newRecipe
       };
 
       return {
@@ -160,15 +218,15 @@ export function ProductModal({
   };
 
   const updateIngredient = (ingredientId: string, field: 'quantity' | 'unit', value: string) => {
-    if (!selectedRecipeSizeId) return;
+    if (!selectedRecipeConfigId) return;
     setEditedProduct(prev => {
       if (!prev) return prev;
-      const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
+      const currentRecipe = prev.recipes[selectedRecipeConfigId] || [];
       return {
         ...prev,
         recipes: {
           ...prev.recipes,
-          [selectedRecipeSizeId]: currentRecipe.map(i => 
+          [selectedRecipeConfigId]: currentRecipe.map(i => 
             i.ingredientId === ingredientId ? { ...i, [field]: value } : i
           )
         }
@@ -417,24 +475,47 @@ export function ProductModal({
               <div className="flex gap-5 flex-1 min-h-0">
                 {/* Left panel: Search ingredients */}
                 <div className="w-1/2 flex flex-col border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                  {editedProduct.sizes.length > 0 && (
-                    <div className="px-3 py-2 border-b border-gray-100 bg-gray-50 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {editedProduct.sizes.map(sizeId => {
-                        const size = sizes.find(s => s.id === sizeId);
-                        return (
-                          <button
-                            key={sizeId}
-                            onClick={() => setSelectedRecipeSizeId(sizeId)}
-                            className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                              selectedRecipeSizeId === sizeId
-                                ? 'bg-[#C2456A] text-white shadow-sm'
-                                : 'bg-white text-gray-500 border border-gray-200 hover:text-[#3a2b27]'
-                            }`}
-                          >
-                            {size?.name || sizeId}
-                          </button>
-                        );
-                      })}
+                  {recipeCombinations.length > 0 && (
+                    <div className="relative px-3 py-2 border-b border-gray-100 bg-gray-50 flex items-center group">
+                      {canScrollLeft && (
+                        <button
+                          onClick={() => scrollCombos('left')}
+                          className="absolute left-1 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-500 hover:text-[#C2456A] opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                      )}
+                      
+                      <div 
+                        ref={scrollContainerRef}
+                        onScroll={checkScroll}
+                        className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full scroll-smooth px-2"
+                      >
+                        {recipeCombinations.map(combo => {
+                          return (
+                            <button
+                              key={combo.id}
+                              onClick={() => setSelectedRecipeConfigId(combo.id)}
+                              className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                selectedRecipeConfigId === combo.id
+                                  ? 'bg-[#C2456A] text-white shadow-sm'
+                                  : 'bg-white text-gray-500 border border-gray-200 hover:text-[#3a2b27]'
+                              }`}
+                            >
+                              {combo.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {canScrollRight && (
+                        <button
+                          onClick={() => scrollCombos('right')}
+                          className="absolute right-1 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/90 shadow-sm border border-gray-200 text-gray-500 hover:text-[#C2456A] opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                   <div className="p-3 border-b border-gray-100 bg-gray-50/80">
@@ -452,7 +533,7 @@ export function ProductModal({
                     {filteredIngredients.length > 0 ? (
                       <div className="divide-y divide-gray-50">
                         {filteredIngredients.map(ing => {
-                          const currentRecipe = selectedRecipeSizeId ? (editedProduct.recipes[selectedRecipeSizeId] || []) : [];
+                          const currentRecipe = selectedRecipeConfigId ? (editedProduct.recipes[selectedRecipeConfigId] || []) : [];
                           const isAdded = currentRecipe.some(i => i.ingredientId === ing.id);
                           return (
                             <div key={ing.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors">
@@ -481,20 +562,20 @@ export function ProductModal({
                 <div className="w-1/2 flex flex-col border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
                   <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80 flex items-center justify-between">
                     <h4 className="font-semibold text-sm text-[#3a2b27]">
-                      Selected ({selectedRecipeSizeId ? (editedProduct.recipes[selectedRecipeSizeId] || []).length : 0})
+                      Selected ({selectedRecipeConfigId ? (editedProduct.recipes[selectedRecipeConfigId] || []).length : 0})
                     </h4>
-                    {editedProduct.sizes.length === 0 && (
-                      <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-0.5 rounded border border-red-100">No sizes selected</span>
+                    {recipeCombinations.length === 0 && (
+                      <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-0.5 rounded border border-red-100">No variants selected</span>
                     )}
                   </div>
                   <div className="flex-1 overflow-y-auto p-3">
-                    {!selectedRecipeSizeId ? (
+                    {!selectedRecipeConfigId ? (
                       <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                        <p className="text-sm font-medium text-gray-400">Please select sizes in the Variants step first.</p>
+                        <p className="text-sm font-medium text-gray-400">Please select variants in the Variants step first.</p>
                       </div>
-                    ) : (editedProduct.recipes[selectedRecipeSizeId] || []).length > 0 ? (
+                    ) : (editedProduct.recipes[selectedRecipeConfigId] || []).length > 0 ? (
                       <div className="space-y-2.5">
-                        {(editedProduct.recipes[selectedRecipeSizeId] || []).map(ing => {
+                        {(editedProduct.recipes[selectedRecipeConfigId] || []).map(ing => {
                           const ingredientDetails = ingredientsList.find(i => i.id === ing.ingredientId);
                           return (
                             <div key={ing.ingredientId} className="p-3 border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors">
@@ -561,16 +642,15 @@ export function ProductModal({
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
                       <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Recipe Status</span>
-                      {editedProduct.sizes.length === 0 ? (
-                        <span className="font-semibold text-gray-400 text-sm">No sizes selected</span>
+                      {recipeCombinations.length === 0 ? (
+                        <span className="font-semibold text-gray-400 text-sm">No variants selected</span>
                       ) : (
                         <div className="space-y-1.5">
-                          {editedProduct.sizes.map(sizeId => {
-                            const size = sizes.find(s => s.id === sizeId);
-                            const hasRecipe = (editedProduct.recipes[sizeId] || []).length > 0;
+                          {recipeCombinations.map(combo => {
+                            const hasRecipe = (editedProduct.recipes[combo.id] || []).length > 0;
                             return (
-                              <div key={sizeId} className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1">
-                                <span className="font-medium text-[#3a2b27]">{size?.name || sizeId}</span>
+                              <div key={combo.id} className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1">
+                                <span className="font-medium text-[#3a2b27]">{combo.name}</span>
                                 <span className={`font-semibold text-xs ${hasRecipe ? 'text-emerald-600' : 'text-gray-400'}`}>
                                   {hasRecipe ? 'Configured' : 'Not configured'}
                                 </span>
