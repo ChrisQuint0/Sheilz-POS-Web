@@ -17,6 +17,7 @@ export interface Product {
 export interface Ingredient {
   id: string;
   name: string;
+  unit: string;
 }
 
 export interface Category {

@@ -125,9 +125,10 @@ export function ProductModal({
       const currentRecipe = prev.recipes[selectedRecipeSizeId] || [];
       if (currentRecipe.some(i => i.ingredientId === ingredientId)) return prev;
       
+      const ingredientUnit = ingredientsList.find(i => i.id === ingredientId)?.unit ?? '';
       const newRecipes = {
         ...prev.recipes,
-        [selectedRecipeSizeId]: [...currentRecipe, { ingredientId, quantity: '1', unit: 'g' }]
+        [selectedRecipeSizeId]: [...currentRecipe, { ingredientId, quantity: '1', unit: ingredientUnit }]
       };
       
       return {
@@ -513,21 +514,9 @@ export function ProductModal({
                                   value={ing.quantity}
                                   onChange={e => updateIngredient(ing.ingredientId, 'quantity', e.target.value)}
                                 />
-                                <Select 
-                                  value={ing.unit} 
-                                  onValueChange={(val) => { if (val) updateIngredient(ing.ingredientId, 'unit', val); }}
-                                >
-                                  <SelectTrigger className="h-8 w-24 bg-white border-gray-200">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="g">g</SelectItem>
-                                    <SelectItem value="ml">ml</SelectItem>
-                                    <SelectItem value="oz">oz</SelectItem>
-                                    <SelectItem value="pump">pump</SelectItem>
-                                    <SelectItem value="piece">piece</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <div className="h-8 w-24 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-500 font-medium select-none">
+                                  {ingredientDetails?.unit ?? ing.unit}
+                                </div>
                               </div>
                             </div>
                           );
