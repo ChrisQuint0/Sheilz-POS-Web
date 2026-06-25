@@ -14,13 +14,12 @@ import { Plus, Search, Settings2, PackageOpen, ShoppingBag, Filter } from 'lucid
 import { ProductCard } from './components/ProductCard';
 import { ProductModal } from './components/ProductModal';
 import { MoreSettingsModal } from './components/MoreSettingsModal';
-import { Product, Category } from './types';
+import { Product, Category, Ingredient } from './types';
 import { createClient } from '@/app/lib/supabase/client';
 import {
   initialPaymentMethods,
   initialSizes,
   initialTemperatures,
-  initialIngredients
 } from './data';
 
 export default function POSSettingsPage() {
@@ -30,7 +29,7 @@ export default function POSSettingsPage() {
   const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods);
   const [sizes, setSizes] = useState(initialSizes);
   const [temperatures, setTemperatures] = useState(initialTemperatures);
-  const [ingredients] = useState(initialIngredients);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,7 +37,7 @@ export default function POSSettingsPage() {
 
     const fetchAllData = async () => {
       try {
-        const [productsRes, categoriesRes, paymentRes, sizesRes, tempsRes] =
+        const [productsRes, categoriesRes, paymentRes, sizesRes, tempsRes, ingredientsRes] =
           await Promise.all([
             supabase.from("products").select("*"),
             supabase.from("product_categories").select("id, name").order("name"),
@@ -51,6 +50,7 @@ export default function POSSettingsPage() {
               .from("temperatures")
               .select("id, name, sort_order")
               .order("sort_order"),
+            supabase.from("inventory_items").select("id, name, unit").order("name"),
           ]);
 
         if (productsRes.error) {
@@ -106,6 +106,16 @@ export default function POSSettingsPage() {
             tempsRes.data.map((temp: any) => ({
               id: temp.id,
               name: temp.name,
+            }))
+          );
+        }
+
+        if (ingredientsRes.data) {
+          setIngredients(
+            ingredientsRes.data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              unit: item.unit,
             }))
           );
         }
