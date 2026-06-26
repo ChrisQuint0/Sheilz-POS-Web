@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
-import { MOCK_USERS, User, Role, Status } from "./data"
+import React, { useState, useMemo, useEffect, useCallback } from "react"
+import { User, Role, Status, mapProfileToUser } from "./data"
+import { fetchTeamMembers, updateUser as updateUserAction, deleteUser as deleteUserAction } from "./actions"
 import { TeamDesktopGrid } from "./components/team-desktop-grid"
 import { TeamMobileList } from "./components/team-mobile-list"
 import { UserDetailsDrawer } from "./components/user-details-drawer"
@@ -11,15 +12,18 @@ import { ResetPasswordModal } from "./components/reset-password-modal"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Upload } from "lucide-react"
+import { Search, Plus, Upload, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useProfile } from "@/components/profile-provider"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 
 export default function TeamPage() {
   const { profile } = useProfile()
   const isAdmin = profile?.role === 'Administrator'
 
-  const [users, setUsers] = useState<User[]>(MOCK_USERS)
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
   
   // Filters
   const [searchQuery, setSearchQuery] = useState("")
@@ -33,23 +37,68 @@ export default function TeamPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
 
+  // Fetch users from Supabase
+  const loadUsers = useCallback(async () => {
+    setLoading(true)
+    const result = await fetchTeamMembers()
+    if (result.success && result.data) {
+      setUsers(result.data.map(mapProfileToUser))
+    } else {
+      toast.error(result.error || 'Failed to load team members.')
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadUsers()
+  }, [loadUsers])
+
   // Handlers
   const handleUserSelect = (user: User) => {
     setSelectedUser(user)
     setIsDrawerOpen(true)
   }
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u))
-    if (selectedUser?.id === updatedUser.id) {
-      setSelectedUser(updatedUser)
+  const handleUpdateUser = async (updatedUser: User) => {
+    const result = await updateUserAction(updatedUser.id, {
+      displayName: updatedUser.displayName,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      status: updatedUser.status,
+      avatarUrl: updatedUser.avatar,
+    })
+    if (result.success) {
+      toast.success(`${updatedUser.displayName} updated successfully.`)
+      await loadUsers()
+      // Update the selected user in the drawer if it's the same user
+      if (selectedUser?.id === updatedUser.id) {
+        setSelectedUser(updatedUser)
+      }
+    } else {
+      toast.error(result.error || 'Failed to update user.')
     }
   }
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter(u => u.id !== userId))
-    setIsDrawerOpen(false)
-    setSelectedUser(null)
+  const handleDeleteUser = async (userId: string) => {
+    const result = await deleteUserAction(userId)
+    if (result.success) {
+      toast.success('User deleted successfully.')
+      setIsDrawerOpen(false)
+      setSelectedUser(null)
+      await loadUsers()
+    } else {
+      toast.error(result.error || 'Failed to delete user.')
+    }
+  }
+
+  const handleUserCreated = async () => {
+    setIsAddModalOpen(false)
+    await loadUsers()
+  }
+
+  const handleUsersImported = async () => {
+    setIsImportModalOpen(false)
+    await loadUsers()
   }
 
   // Filtering Logic
@@ -131,7 +180,13 @@ export default function TeamPage() {
 
       {/* Main Content Area */}
       <div className="flex-1 p-6 pt-2 overflow-hidden flex flex-col">
-        {filteredUsers.length === 0 ? (
+        {loading ? (
+          <div className="flex-1 flex flex-col gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-md" />
+            ))}
+          </div>
+        ) : filteredUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center border rounded-lg border-dashed p-8">
             <h3 className="text-lg font-medium text-foreground">No team members found</h3>
             <p className="text-sm text-muted-foreground mt-1 mb-4">{isAdmin ? 'Create your first staff account to get started.' : 'No team members match your filters.'}</p>
@@ -181,19 +236,13 @@ export default function TeamPage() {
       <AddUserModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
-        onAdd={(newUser) => {
-          setUsers([newUser, ...users])
-          setIsAddModalOpen(false)
-        }}
+        onUserCreated={handleUserCreated}
       />
 
       <ImportUsersModal
         open={isImportModalOpen}
         onOpenChange={setIsImportModalOpen}
-        onImport={(importedUsers) => {
-          setUsers([...importedUsers, ...users])
-          setIsImportModalOpen(false)
-        }}
+        onUsersImported={handleUsersImported}
       />
 
       {selectedUser && (

@@ -12,44 +12,28 @@ export interface User {
   createdDate: string; // ISO date string
 }
 
-export const MOCK_USERS: User[] = [
-  {
-    id: "1",
-    avatar: "/sheilz_pos_logo.png",
-    displayName: "Jane Admin",
-    email: "jane@sheilz.com",
-    role: "Administrator",
-    status: "Active",
-    lastLogin: "2026-06-21T09:35:00Z",
-    createdDate: "2025-01-10T08:00:00Z"
-  },
-  {
-    id: "2",
-    displayName: "Mark Manager",
-    email: "mark@sheilz.com",
-    role: "Manager",
-    status: "Active",
-    lastLogin: "2026-06-20T14:20:00Z",
-    createdDate: "2025-02-15T09:00:00Z"
-  },
-  {
-    id: "3",
-    displayName: "Sarah Cashier",
-    email: "sarah@sheilz.com",
-    role: "Cashier",
-    status: "Active",
-    lastLogin: "2026-06-21T07:15:00Z",
-    createdDate: "2025-06-20T10:00:00Z"
-  },
-  {
-    id: "4",
-    displayName: "John Doe",
-    email: "john@sheilz.com",
-    role: "Cashier",
-    status: "Inactive",
-    createdDate: "2025-11-05T08:30:00Z"
-  }
-];
+/** Map a Supabase `profiles` row (snake_case) to the UI `User` type (camelCase). */
+export function mapProfileToUser(row: {
+  id: string;
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
+  role: string;
+  status: string;
+  last_login: string | null;
+  created_at: string;
+}): User {
+  return {
+    id: row.id,
+    avatar: row.avatar_url ?? undefined,
+    displayName: row.display_name,
+    email: row.email,
+    role: row.role as Role,
+    status: row.status as Status,
+    lastLogin: row.last_login ?? undefined,
+    createdDate: row.created_at,
+  };
+}
 
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   Administrator: [

@@ -4,6 +4,7 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { ProfileProvider } from "@/components/profile-provider";
+import { Toaster } from "sonner";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -29,6 +30,7 @@ export default function RootLayout({
         <ProfileProvider>
           <TooltipProvider>
             <DashboardLayout>{children}</DashboardLayout>
+            <Toaster richColors position="top-right" />
           </TooltipProvider>
         </ProfileProvider>
       </body>

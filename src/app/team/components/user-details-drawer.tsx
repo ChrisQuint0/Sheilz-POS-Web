@@ -4,19 +4,21 @@ import React, { useState, useEffect } from "react"
 import { User, ROLE_PERMISSIONS, Role, Status } from "../data"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { Check, Trash2, KeyRound, Upload, Save } from "lucide-react"
+import { Check, Trash2, KeyRound, Upload, Save, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import Image from "next/image"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { createClient } from "@/app/lib/supabase/client"
+import { toast } from "sonner"
 
 interface UserDetailsDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   user: User | null
-  onUpdateUser: (user: User) => void
-  onDeleteUser: (userId: string) => void
+  onUpdateUser: (user: User) => Promise<void>
+  onDeleteUser: (userId: string) => Promise<void>
   onResetPassword: () => void
 }
 
@@ -29,18 +31,74 @@ export function UserDetailsDrawer({
   onResetPassword
 }: UserDetailsDrawerProps) {
   const [formData, setFormData] = useState<User | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
+  
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
       setFormData(user ? { ...user } : null)
+      setAvatarFile(null)
+      setAvatarPreview(null)
+      setDeleteError("")
     }
   }, [user, open])
 
   if (!user || !formData) return null
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setAvatarFile(file)
+      setAvatarPreview(URL.createObjectURL(file))
+      setFormData({ ...formData, avatar: URL.createObjectURL(file) }) // temporary preview
+    }
+  }
+
   const permissions = ROLE_PERMISSIONS[formData.role] || []
-  const hasAssociatedRecords = formData.email === "jane@sheilz.com"
-  const hasChanges = JSON.stringify(formData) !== JSON.stringify(user)
+  const hasChanges = JSON.stringify(formData) !== JSON.stringify(user) || avatarFile !== null
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    
+    let avatarUrl = formData.avatar
+    if (avatarFile) {
+      const supabase = createClient()
+      const ext = avatarFile.name.split('.').pop()
+      const fileName = `avatars/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, avatarFile)
+
+      if (uploadError) {
+        toast.error(`Failed to upload avatar: ${uploadError.message}`)
+        setIsSaving(false)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName)
+        
+      avatarUrl = publicUrlData.publicUrl
+      setFormData({ ...formData, avatar: avatarUrl })
+    }
+
+    await onUpdateUser({ ...formData, avatar: avatarUrl })
+    setIsSaving(false)
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    setDeleteError("")
+    await onDeleteUser(user.id)
+    setIsDeleting(false)
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -59,9 +117,20 @@ export function UserDetailsDrawer({
               <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Profile</h3>
               <div className="flex flex-col gap-4 p-4 border rounded-lg bg-card shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="relative h-16 w-16 rounded-full overflow-hidden bg-muted flex-shrink-0 cursor-pointer group border-2 border-transparent hover:border-primary transition-colors">
-                    {formData.avatar ? (
-                      <Image src={formData.avatar} alt={formData.displayName} fill sizes="64px" className="object-cover" />
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFileChange} 
+                    disabled={isSaving}
+                  />
+                  <div 
+                    className="relative h-16 w-16 rounded-full overflow-hidden bg-muted flex-shrink-0 cursor-pointer group border-2 border-transparent hover:border-primary transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {avatarPreview || formData.avatar ? (
+                      <img src={avatarPreview || formData.avatar || ""} alt={formData.displayName} className="h-full w-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xl font-medium text-muted-foreground bg-primary/10">
                         {formData.displayName.charAt(0)}
@@ -78,6 +147,7 @@ export function UserDetailsDrawer({
                         value={formData.displayName} 
                         onChange={e => setFormData({...formData, displayName: e.target.value})}
                         className="h-8"
+                        disabled={isSaving}
                       />
                     </div>
                     <div className="space-y-1">
@@ -86,6 +156,7 @@ export function UserDetailsDrawer({
                         value={formData.email} 
                         onChange={e => setFormData({...formData, email: e.target.value})}
                         className="h-8"
+                        disabled={isSaving}
                       />
                     </div>
                   </div>
@@ -99,7 +170,7 @@ export function UserDetailsDrawer({
               <div className="space-y-3 p-4 border rounded-lg bg-card shadow-sm text-sm">
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Role</span>
-                  <Select value={formData.role} onValueChange={(val) => setFormData({...formData, role: val as Role})}>
+                  <Select value={formData.role} onValueChange={(val) => setFormData({...formData, role: val as Role})} disabled={isSaving}>
                     <SelectTrigger className="w-[140px] h-8">
                       <SelectValue />
                     </SelectTrigger>
@@ -112,7 +183,7 @@ export function UserDetailsDrawer({
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Status</span>
-                  <Select value={formData.status} onValueChange={(val) => setFormData({...formData, status: val as Status})}>
+                  <Select value={formData.status} onValueChange={(val) => setFormData({...formData, status: val as Status})} disabled={isSaving}>
                     <SelectTrigger className="w-[140px] h-8">
                       <SelectValue />
                     </SelectTrigger>
@@ -155,24 +226,34 @@ export function UserDetailsDrawer({
 
         <SheetFooter className="p-6 pt-4 border-t mt-auto flex-col sm:flex-col gap-3">
            {hasChanges && (
-             <Button className="w-full justify-center bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdateUser(formData)}>
-               <Save className="mr-2 h-4 w-4" /> Save Changes
+             <Button 
+               className="w-full justify-center bg-green-600 hover:bg-green-700 text-white" 
+               onClick={handleSave}
+               disabled={isSaving}
+             >
+               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+               Save Changes
              </Button>
            )}
-           <Button variant="outline" className="w-full justify-center" onClick={onResetPassword}>
+           <Button variant="outline" className="w-full justify-center" onClick={onResetPassword} disabled={isSaving || isDeleting}>
              <KeyRound className="mr-2 h-4 w-4" /> Reset Password
            </Button>
            
-           {hasAssociatedRecords ? (
-             <div className="p-3 bg-muted rounded-md text-xs text-muted-foreground text-center border">
-                This user cannot be deleted because historical records are associated with the account. 
-                Consider changing their status to Inactive instead.
+           {deleteError && (
+             <div className="p-3 bg-destructive/10 text-destructive text-xs rounded-md border border-destructive/20">
+               {deleteError}
              </div>
-           ) : (
-             <Button variant="destructive" className="w-full justify-center" onClick={() => onDeleteUser(user.id)}>
-               <Trash2 className="mr-2 h-4 w-4" /> Delete User
-             </Button>
            )}
+           
+           <Button 
+             variant="destructive" 
+             className="w-full justify-center" 
+             onClick={handleDelete}
+             disabled={isSaving || isDeleting}
+           >
+             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+             Delete User
+           </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
