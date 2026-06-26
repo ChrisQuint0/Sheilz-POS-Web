@@ -74,9 +74,9 @@ export function ProductModal({
   // Get the steps based on product type
   const getSteps = (type: ProductType): string[] => {
     if (type === "Beverage") {
-      return ["Basic Details", "Pricing", "Variants", "Recipe", "Summary"];
+      return ["Basic Details", "Variants", "Pricing", "Recipe", "Summary"];
     }
-    return ["Basic Details", "Pricing", "Summary"]; // Pastry: Basic Details → Pricing → Summary
+    return ["Basic Details", "Pricing", "Summary"];
   };
 
   const steps = getSteps(editedProduct?.type || "Beverage");
@@ -116,6 +116,20 @@ export function ProductModal({
     return combos;
   }, [editedProduct?.sizes, editedProduct?.temperatures, sizes, temperatures]);
 
+  // Only combos that have a price set — used in the Recipe step
+  const pricedVariantCombinations = React.useMemo(() => {
+    if (!editedProduct) return [];
+    return variantCombinations.filter((combo) => {
+      const price = editedProduct.prices?.[combo.id];
+      return (
+        price !== undefined &&
+        price !== null &&
+        !isNaN(price) &&
+        String(price).trim() !== ""
+      );
+    });
+  }, [variantCombinations, editedProduct?.prices]);
+
   const checkScroll = React.useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } =
@@ -150,19 +164,22 @@ export function ProductModal({
     }
   };
 
+  // Recipe step: auto-select first priced combo as active tab
   useEffect(() => {
     if (step === 3 && editedProduct?.type === "Beverage") {
       if (
-        variantCombinations.length > 0 &&
+        pricedVariantCombinations.length > 0 &&
         (!selectedRecipeConfigId ||
-          !variantCombinations.some((c) => c.id === selectedRecipeConfigId))
+          !pricedVariantCombinations.some(
+            (c) => c.id === selectedRecipeConfigId,
+          ))
       ) {
-        setSelectedRecipeConfigId(variantCombinations[0].id);
-      } else if (variantCombinations.length === 0) {
+        setSelectedRecipeConfigId(pricedVariantCombinations[0].id);
+      } else if (pricedVariantCombinations.length === 0) {
         setSelectedRecipeConfigId(null);
       }
     }
-  }, [step, variantCombinations, selectedRecipeConfigId, editedProduct]);
+  }, [step, pricedVariantCombinations, selectedRecipeConfigId, editedProduct]);
 
   useEffect(() => {
     if (open) {
@@ -202,9 +219,9 @@ export function ProductModal({
   const isEditing = !!product;
 
   const nextStep = () => {
-    // For Pastry products, Pricing is step 1 (index 1)
-    // For Beverage products, Pricing is step 1 (index 1) as well
-    if (step === 1) {
+    // Beverage: Pricing is step 2. Pastry: Pricing is step 1.
+    const pricingStepIndex = editedProduct.type === "Beverage" ? 2 : 1;
+    if (step === pricingStepIndex) {
       const errors: string[] = [];
       for (const combo of variantCombinations) {
         const price = editedProduct.prices?.[combo.id];
@@ -572,68 +589,8 @@ export function ProductModal({
             </div>
           )}
 
-          {/* Step 2: Pricing */}
-          {step === 1 && (
-            <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
-              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
-                <div>
-                  <h3 className="font-semibold text-[#3a2b27] text-lg">
-                    Pricing Configuration
-                  </h3>
-                  <p className="text-sm text-gray-400 mt-0.5">
-                    Assign a selling price to each variant combination.
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  {variantCombinations.map((combo) => {
-                    const hasError = pricingErrors.includes(combo.id);
-                    return (
-                      <div key={combo.id} className="flex items-center gap-4">
-                        <Label className="w-1/2 font-medium text-sm text-[#3a2b27]">
-                          {combo.name}
-                        </Label>
-                        <div className="relative w-1/2">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">
-                            ₱
-                          </span>
-                          <Input
-                            type="number"
-                            placeholder="0.00"
-                            className={`pl-7 h-10 ${hasError ? "border-red-500 focus:ring-red-500/20" : "border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20"}`}
-                            value={editedProduct.prices?.[combo.id] ?? ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditedProduct((prev) => {
-                                if (!prev) return prev;
-                                const newPrices = { ...prev.prices };
-                                if (val === "") {
-                                  delete newPrices[combo.id];
-                                } else {
-                                  newPrices[combo.id] = parseFloat(val);
-                                }
-                                return { ...prev, prices: newPrices };
-                              });
-                              setPricingErrors((prev) =>
-                                prev.filter((id) => id !== combo.id),
-                              );
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {pricingErrors.length > 0 && (
-                    <div className="text-red-500 text-sm font-medium mt-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                      Please enter a valid price for all combinations.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Variants (only for Beverages) */}
-          {step === 2 && editedProduct?.type === "Beverage" && (
+          {/* Step 2: Variants (Beverage only) */}
+          {step === 1 && editedProduct?.type === "Beverage" && (
             <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
               <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
                 <div>
@@ -717,304 +674,291 @@ export function ProductModal({
             </div>
           )}
 
-          {/* Step 2: Summary (for Pastry) */}
-          {step === 2 && editedProduct?.type === "Pastry" && (
+          {/* Step 2: Pricing (Pastry) or Step 3: Pricing (Beverage) */}
+          {((step === 1 && editedProduct?.type === "Pastry") ||
+            (step === 2 && editedProduct?.type === "Beverage")) && (
             <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
-              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-[#3a2b27] mb-5">
-                  Product Summary
-                </h3>
-
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Name
-                      </span>
-                      <span className="font-semibold text-[#3a2b27]">
-                        {editedProduct.name || "—"}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Category
-                      </span>
-                      <span className="font-semibold text-[#3a2b27]">
-                        {categories.find(
-                          (c) => c.id === editedProduct.categoryId,
-                        )?.name || "—"}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Type
-                      </span>
-                      <span
-                        className={`inline-flex items-center font-semibold text-sm px-2.5 py-0.5 rounded-full ${
-                          editedProduct.type === "Beverage"
-                            ? "bg-blue-50 text-blue-600"
-                            : "bg-amber-50 text-amber-600"
-                        }`}
-                      >
-                        {editedProduct.type}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Pricing
-                      </span>
-                      <div className="space-y-1.5">
-                        {variantCombinations.map((combo) => {
-                          const price = editedProduct.prices?.[combo.id];
-                          return (
-                            <div
-                              key={combo.id}
-                              className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1"
-                            >
-                              <span className="font-medium text-[#3a2b27]">
-                                {combo.name}
-                              </span>
-                              <span className="font-semibold text-gray-700">
-                                {price !== undefined &&
-                                price !== null &&
-                                !isNaN(price)
-                                  ? `₱${price}`
-                                  : "—"}
-                              </span>
-                            </div>
-                          );
-                        })}
+              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+                <div>
+                  <h3 className="font-semibold text-[#3a2b27] text-lg">
+                    Pricing Configuration
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    Assign a selling price to each variant combination.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {variantCombinations.map((combo) => {
+                    const hasError = pricingErrors.includes(combo.id);
+                    return (
+                      <div key={combo.id} className="flex items-center gap-4">
+                        <Label className="w-1/2 font-medium text-sm text-[#3a2b27]">
+                          {combo.name}
+                        </Label>
+                        <div className="relative w-1/2">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">
+                            ₱
+                          </span>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            className={`pl-7 h-10 ${hasError ? "border-red-500 focus:ring-red-500/20" : "border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20"}`}
+                            value={editedProduct.prices?.[combo.id] ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditedProduct((prev) => {
+                                if (!prev) return prev;
+                                const newPrices = { ...prev.prices };
+                                if (val === "") {
+                                  delete newPrices[combo.id];
+                                } else {
+                                  newPrices[combo.id] = parseFloat(val);
+                                }
+                                return { ...prev, prices: newPrices };
+                              });
+                              setPricingErrors((prev) =>
+                                prev.filter((id) => id !== combo.id),
+                              );
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {(editedProduct.sizes.length > 0 ||
-                    editedProduct.temperatures.length > 0) && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">
-                        Variants
-                      </span>
-                      <div className="flex gap-2 flex-wrap">
-                        {editedProduct.sizes.map((id) => {
-                          const s = sizes.find((s) => s.id === id);
-                          return s ? (
-                            <span
-                              key={id}
-                              className="text-xs font-medium bg-white border border-gray-200 px-2.5 py-1 rounded-lg text-[#3a2b27]"
-                            >
-                              {s.name}
-                            </span>
-                          ) : null;
-                        })}
-                        {editedProduct.temperatures.map((id) => {
-                          const t = temperatures.find((t) => t.id === id);
-                          return t ? (
-                            <span
-                              key={id}
-                              className={`text-xs font-medium px-2.5 py-1 rounded-lg ${
-                                t.name === "Hot"
-                                  ? "bg-red-50 text-red-500 border border-red-100"
-                                  : t.name === "Cold"
-                                    ? "bg-sky-50 text-sky-500 border border-sky-100"
-                                    : "bg-white border border-gray-200 text-[#3a2b27]"
-                              }`}
-                            >
-                              {t.name}
-                            </span>
-                          ) : null;
-                        })}
-                      </div>
+                    );
+                  })}
+                  {pricingErrors.length > 0 && (
+                    <div className="text-red-500 text-sm font-medium mt-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                      Please enter a valid price for all combinations.
                     </div>
                   )}
                 </div>
               </div>
-
-              <div className="bg-white rounded-xl border-2 border-[#C2456A]/15 p-5 shadow-sm flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base font-bold text-[#3a2b27]">
-                    Available in POS
-                  </Label>
-                  <p className="text-sm text-gray-400">
-                    Toggle off to hide from the mobile app catalog.
-                  </p>
-                </div>
-                <Switch
-                  checked={editedProduct.isVisible}
-                  onCheckedChange={(checked) =>
-                    setEditedProduct({ ...editedProduct, isVisible: checked })
-                  }
-                />
-              </div>
             </div>
           )}
 
-          {/* Step 4: Summary (for Beverage) */}
-          {step === 4 && editedProduct?.type === "Beverage" && (
-            <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
-              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-[#3a2b27] mb-5">
-                  Product Summary
-                </h3>
+          {/* Step 4: Recipe (Beverage only) — shows only priced combos */}
+          {step === 3 && editedProduct?.type === "Beverage" && (
+            <div className="space-y-4 animate-in fade-in duration-300 flex flex-col h-full min-h-[420px]">
+              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+                <div>
+                  <h3 className="font-semibold text-[#3a2b27] text-lg">
+                    Recipe Configuration
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    Define the ingredients for each priced variant.
+                  </p>
+                </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Name
-                      </span>
-                      <span className="font-semibold text-[#3a2b27]">
-                        {editedProduct.name || "—"}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Category
-                      </span>
-                      <span className="font-semibold text-[#3a2b27]">
-                        {categories.find(
-                          (c) => c.id === editedProduct.categoryId,
-                        )?.name || "—"}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Type
-                      </span>
-                      <span
-                        className={`inline-flex items-center font-semibold text-sm px-2.5 py-0.5 rounded-full ${
-                          editedProduct.type === "Beverage"
-                            ? "bg-blue-50 text-blue-600"
-                            : "bg-amber-50 text-amber-600"
-                        }`}
+                {/* Variant tabs */}
+                {pricedVariantCombinations.length > 0 ? (
+                  <>
+                    <div className="relative">
+                      <div
+                        ref={scrollContainerRef}
+                        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                        onScroll={checkScroll}
                       >
-                        {editedProduct.type}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Pricing
-                      </span>
-                      <div className="space-y-1.5">
-                        {variantCombinations.map((combo) => {
-                          const price = editedProduct.prices?.[combo.id];
+                        {pricedVariantCombinations.map((combo) => {
+                          const isActive = selectedRecipeConfigId === combo.id;
                           return (
-                            <div
+                            <button
                               key={combo.id}
-                              className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1"
+                              onClick={() =>
+                                setSelectedRecipeConfigId(combo.id)
+                              }
+                              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                                isActive
+                                  ? "bg-[#C2456A] text-white shadow-md shadow-[#C2456A]/25"
+                                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              }`}
                             >
-                              <span className="font-medium text-[#3a2b27]">
-                                {combo.name}
-                              </span>
-                              <span className="font-semibold text-gray-700">
-                                {price !== undefined &&
-                                price !== null &&
-                                !isNaN(price)
-                                  ? `₱${price}`
-                                  : "—"}
-                              </span>
-                            </div>
+                              {combo.name}
+                            </button>
                           );
                         })}
                       </div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4 col-span-2 sm:col-span-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                        Recipe Status
-                      </span>
-                      {variantCombinations.length === 0 ? (
-                        <span className="font-semibold text-gray-400 text-sm">
-                          No variants selected
-                        </span>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {variantCombinations.map((combo) => {
-                            const hasRecipe =
-                              (editedProduct.recipes[combo.id] || []).length >
-                              0;
-                            return (
-                              <div
-                                key={combo.id}
-                                className="flex flex-col xl:flex-row xl:items-center justify-between text-sm gap-1"
-                              >
-                                <span className="font-medium text-[#3a2b27]">
-                                  {combo.name}
-                                </span>
-                                <span
-                                  className={`font-semibold text-xs ${hasRecipe ? "text-emerald-600" : "text-gray-400"}`}
-                                >
-                                  {hasRecipe ? "Configured" : "Not configured"}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                      {canScrollLeft && (
+                        <button
+                          onClick={() => scrollCombos("left")}
+                          className="absolute left-0 top-1/2 -translate-y-1/2 bg-white shadow-md rounded-full p-1.5 border border-gray-200 hover:bg-gray-50"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-gray-600" />
+                        </button>
+                      )}
+                      {canScrollRight && (
+                        <button
+                          onClick={() => scrollCombos("right")}
+                          className="absolute right-0 top-1/2 -translate-y-1/2 bg-white shadow-md rounded-full p-1.5 border border-gray-200 hover:bg-gray-50"
+                        >
+                          <ChevronRight className="w-4 h-4 text-gray-600" />
+                        </button>
                       )}
                     </div>
-                  </div>
 
-                  {(editedProduct.sizes.length > 0 ||
-                    editedProduct.temperatures.length > 0) && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">
-                        Variants
-                      </span>
-                      <div className="flex gap-2 flex-wrap">
-                        {editedProduct.sizes.map((id) => {
-                          const s = sizes.find((s) => s.id === id);
-                          return s ? (
-                            <span
-                              key={id}
-                              className="text-xs font-medium bg-white border border-gray-200 px-2.5 py-1 rounded-lg text-[#3a2b27]"
-                            >
-                              {s.name}
-                            </span>
-                          ) : null;
-                        })}
-                        {editedProduct.temperatures.map((id) => {
-                          const t = temperatures.find((t) => t.id === id);
-                          return t ? (
-                            <span
-                              key={id}
-                              className={`text-xs font-medium px-2.5 py-1 rounded-lg ${
-                                t.name === "Hot"
-                                  ? "bg-red-50 text-red-500 border border-red-100"
-                                  : t.name === "Cold"
-                                    ? "bg-sky-50 text-sky-500 border border-sky-100"
-                                    : "bg-white border border-gray-200 text-[#3a2b27]"
-                              }`}
-                            >
-                              {t.name}
-                            </span>
-                          ) : null;
-                        })}
+                    {/* Ingredients for selected variant - Flex row layout */}
+                    {selectedRecipeConfigId && (
+                      <div className="flex gap-6">
+                        {/* Left side - Available ingredients */}
+                        <div className="flex-1 space-y-2">
+                          <Label className="font-semibold text-[#3a2b27] text-sm">
+                            Available Ingredients
+                          </Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Input
+                              placeholder="Search ingredients..."
+                              className="pl-9 h-10 bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20"
+                              value={ingredientSearch}
+                              onChange={(e) =>
+                                setIngredientSearch(e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="max-h-64 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2">
+                            {filteredIngredients.length > 0 ? (
+                              filteredIngredients.map((ingredient) => {
+                                const isAdded = (
+                                  editedProduct.recipes[
+                                    selectedRecipeConfigId
+                                  ] || []
+                                ).some((i) => i.ingredientId === ingredient.id);
+                                return (
+                                  <div
+                                    key={ingredient.id}
+                                    className={`flex items-center justify-between p-2 rounded-lg transition-all ${
+                                      isAdded
+                                        ? "bg-gray-50 opacity-60"
+                                        : "hover:bg-gray-50 cursor-pointer"
+                                    }`}
+                                    onClick={() =>
+                                      !isAdded &&
+                                      handleAddIngredient(ingredient.id)
+                                    }
+                                  >
+                                    <div>
+                                      <span className="text-sm font-medium text-[#3a2b27]">
+                                        {ingredient.name}
+                                      </span>
+                                      <span className="text-xs text-gray-400 ml-2">
+                                        {ingredient.unit}
+                                      </span>
+                                    </div>
+                                    {isAdded ? (
+                                      <Check className="w-4 h-4 text-emerald-500" />
+                                    ) : (
+                                      <Plus className="w-4 h-4 text-gray-400 hover:text-[#C2456A]" />
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="text-center py-4 text-gray-400 text-sm">
+                                No ingredients found
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right side - Selected ingredients */}
+                        <div className="flex-1 space-y-2">
+                          <Label className="font-semibold text-[#3a2b27] text-sm">
+                            Selected Ingredients
+                          </Label>
+                          {(editedProduct.recipes[selectedRecipeConfigId] || [])
+                            .length > 0 ? (
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                              {editedProduct.recipes[
+                                selectedRecipeConfigId
+                              ].map((item) => {
+                                const ingredient = ingredientsList.find(
+                                  (i) => i.id === item.ingredientId,
+                                );
+                                if (!ingredient) return null;
+                                return (
+                                  <div
+                                    key={item.ingredientId}
+                                    className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 border border-gray-200"
+                                  >
+                                    <div className="flex-1">
+                                      <span className="font-medium text-[#3a2b27] text-sm">
+                                        {ingredient.name}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        className="w-20 h-8 text-sm border-gray-200"
+                                        value={item.quantity}
+                                        onChange={(e) =>
+                                          updateIngredient(
+                                            item.ingredientId,
+                                            "quantity",
+                                            e.target.value,
+                                          )
+                                        }
+                                      />
+                                      <Select
+                                        value={item.unit}
+                                        onValueChange={(val) =>
+                                          updateIngredient(
+                                            item.ingredientId,
+                                            "unit",
+                                            val,
+                                          )
+                                        }
+                                      >
+                                        <SelectTrigger className="w-24 h-8 text-sm border-gray-200">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </Select>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                        onClick={() =>
+                                          handleRemoveIngredient(
+                                            item.ingredientId,
+                                          )
+                                        }
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg h-48 flex items-center justify-center">
+                              <div>
+                                <p className="text-sm">
+                                  No ingredients selected
+                                </p>
+                                <p className="text-xs mt-1">
+                                  Click on ingredients from the left to add them
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border-2 border-[#C2456A]/15 p-5 shadow-sm flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base font-bold text-[#3a2b27]">
-                    Available in POS
-                  </Label>
-                  <p className="text-sm text-gray-400">
-                    Toggle off to hide from the mobile app catalog.
-                  </p>
-                </div>
-                <Switch
-                  checked={editedProduct.isVisible}
-                  onCheckedChange={(checked) =>
-                    setEditedProduct({ ...editedProduct, isVisible: checked })
-                  }
-                />
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12 text-gray-400">
+                    <p className="font-medium">No priced variants available</p>
+                    <p className="text-sm mt-1">
+                      Please go back to the Pricing step and set prices for at
+                      least one variant.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Step 4 or 5: Summary (depending on product type) */}
-          {((step === 3 && !showRecipeStep) ||
-            (step === 4 && showRecipeStep)) && (
+          {/* Summary step — Pastry: step 2, Beverage: step 4 */}
+          {((step === 2 && editedProduct?.type === "Pastry") ||
+            (step === 4 && editedProduct?.type === "Beverage")) && (
             <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
               <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-[#3a2b27] mb-5">
@@ -1087,13 +1031,13 @@ export function ProductModal({
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
                           Recipe Status
                         </span>
-                        {variantCombinations.length === 0 ? (
+                        {pricedVariantCombinations.length === 0 ? (
                           <span className="font-semibold text-gray-400 text-sm">
-                            No variants selected
+                            No priced variants
                           </span>
                         ) : (
                           <div className="space-y-1.5">
-                            {variantCombinations.map((combo) => {
+                            {pricedVariantCombinations.map((combo) => {
                               const hasRecipe =
                                 (editedProduct.recipes[combo.id] || []).length >
                                 0;
