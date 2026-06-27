@@ -3,15 +3,33 @@
 import { Bar } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultChartOptions, chartColors } from "./chart-setup";
-import { Droplets, PackageSearch } from "lucide-react";
+import { Droplets, PackageSearch, Loader2 } from "lucide-react";
+import { useAnalytics } from "../analytics-context";
 
 export function InventoryAnalytics() {
+  const { data, loading } = useAnalytics();
+
+  if (loading) {
+    return (
+      <>
+        <Card className="shadow-sm col-span-full lg:col-span-2 h-[350px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+        </Card>
+        <Card className="shadow-sm col-span-full lg:col-span-1 h-[350px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+        </Card>
+      </>
+    );
+  }
+
+  const { mostConsumed, leastConsumed } = data;
+
   const mostConsumedData = {
-    labels: ["Milk (L)", "Coffee Beans (kg)", "Ice (kg)", "Condensed Milk (kg)"],
+    labels: mostConsumed.map(i => `${i.item_name} (${i.unit})`),
     datasets: [
       {
         label: "Consumption",
-        data: [120, 75, 60, 25],
+        data: mostConsumed.map(i => Number(i.total_consumed)),
         backgroundColor: chartColors.primary,
         borderRadius: 4,
         borderSkipped: false,
@@ -20,11 +38,11 @@ export function InventoryAnalytics() {
   };
 
   const leastConsumedData = {
-    labels: ["Cinnamon Powder", "Yuzu Syrup", "Blueberry Jam", "Hazelnut Syrup"],
+    labels: leastConsumed.map(i => `${i.item_name} (${i.unit})`),
     datasets: [
       {
         label: "Consumption",
-        data: [0.5, 1.2, 1.5, 2.0],
+        data: leastConsumed.map(i => Number(i.total_consumed)),
         backgroundColor: chartColors.chart4,
         borderRadius: 4,
         borderSkipped: false,
@@ -67,7 +85,13 @@ export function InventoryAnalytics() {
         </CardHeader>
         <CardContent>
           <div className="h-[250px] w-full">
-            <Bar data={mostConsumedData} options={horizontalOptions as any} />
+            {mostConsumed.length > 0 ? (
+              <Bar data={mostConsumedData} options={horizontalOptions as any} />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+                No consumption data available.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -84,7 +108,13 @@ export function InventoryAnalytics() {
         </CardHeader>
         <CardContent>
           <div className="h-[250px] w-full">
-            <Bar data={leastConsumedData} options={horizontalOptions as any} />
+            {leastConsumed.length > 0 ? (
+              <Bar data={leastConsumedData} options={horizontalOptions as any} />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+                No consumption data available.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
