@@ -11,18 +11,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Plus,
   Search,
   Settings2,
   PackageOpen,
   ShoppingBag,
   Filter,
+  Check,
 } from "lucide-react";
 import { ProductCard } from "./components/ProductCard";
 import { ProductModal } from "./components/ProductModal";
 import { MoreSettingsModal } from "./components/MoreSettingsModal";
 import { Product, Category, Ingredient } from "./types";
 import { createClient } from "@/app/lib/supabase/client";
+import { toast } from "sonner";
 import {
   initialPaymentMethods,
   initialSizes,
@@ -502,6 +512,13 @@ export default function POSSettingsPage() {
     setIsModalOpen(true);
   };
 
+  const handleProductDelete = (productId: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    toast.success("Successfully Deleted", {
+      description: "The product has been successfully removed from your catalog.",
+    });
+  };
+
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
       {loading ? (
@@ -697,6 +714,7 @@ export default function POSSettingsPage() {
             temperatures={temperatures}
             ingredientsList={ingredients}
             onSave={handleProductSave}
+            onDelete={handleProductDelete}
           />
 
           <MoreSettingsModal

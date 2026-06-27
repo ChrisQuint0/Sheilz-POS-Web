@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ interface ProductModalProps {
   temperatures: TemperatureOption[];
   ingredientsList: Ingredient[];
   onSave: (product: Product) => void;
+  onDelete?: (productId: string) => void;
 }
 
 export function ProductModal({
@@ -57,8 +59,10 @@ export function ProductModal({
   temperatures,
   ingredientsList,
   onSave,
+  onDelete,
 }: ProductModalProps) {
   const [step, setStep] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editedProduct, setEditedProduct] = useState<Product | null>(null);
   const [ingredientSearch, setIngredientSearch] = useState("");
   const [selectedRecipeConfigId, setSelectedRecipeConfigId] = useState<
@@ -342,7 +346,8 @@ export function ProductModal({
   const showRecipeStep = editedProduct.type === "Beverage";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] md:max-w-[900px] lg:max-w-[1000px] w-[95vw] p-0 flex flex-col gap-0 max-h-[90vh] overflow-hidden border-gray-200">
         {/* Header */}
         <div className="p-6 pb-5 border-b border-gray-100 bg-white z-10 shrink-0">
@@ -1128,7 +1133,19 @@ export function ProductModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 bg-white z-10 shrink-0 flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2">
+            {isEditing && (
+              <Button
+                variant="ghost"
+                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Delete
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
             {step > 0 ? (
               <Button
                 variant="ghost"
@@ -1146,9 +1163,7 @@ export function ProductModal({
                 Cancel
               </Button>
             )}
-          </div>
 
-          <div>
             {step < steps.length - 1 ? (
               <Button
                 onClick={nextStep}
@@ -1170,6 +1185,41 @@ export function ProductModal({
           </div>
         </div>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      {isEditing && (
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-red-600">Delete Product</DialogTitle>
+              <DialogDescription className="text-gray-600 mt-2">
+                Are you sure you want to delete this product? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4 flex gap-2 sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="bg-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-500 hover:bg-red-600 text-white"
+                onClick={() => {
+                  if (editedProduct) {
+                    onDelete?.(editedProduct.id);
+                  }
+                  setShowDeleteConfirm(false);
+                  onOpenChange(false);
+                }}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
