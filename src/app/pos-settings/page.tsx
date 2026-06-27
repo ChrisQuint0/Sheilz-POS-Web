@@ -183,7 +183,7 @@ export default function POSSettingsPage() {
             // Build recipes grouped by variant combo
             const productRecipes: Record<
               string,
-              Array<{ ingredientId: string; quantity: number; unit: string }>
+              Array<{ ingredientId: string; quantity: string; unit: string }>
             > = {};
 
             productVariants.forEach((variant: any) => {
@@ -199,7 +199,7 @@ export default function POSSettingsPage() {
               if (variantRecipes.length > 0) {
                 productRecipes[comboKey] = variantRecipes.map((r: any) => ({
                   ingredientId: r.inventory_item_id,
-                  quantity: r.quantity,
+                  quantity: String(r.quantity),
                   unit: r.unit || "",
                 }));
               }

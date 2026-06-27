@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, RefreshCw, FileImage, BarChart3, CalendarDays } from "lucide-react";
+import { Download, RefreshCw, FileImage, BarChart3, CalendarDays, Loader2 } from "lucide-react";
+import { useAnalytics } from "../analytics-context";
 
 interface AnalyticsFiltersProps {
   onExportExcel: () => void;
@@ -18,6 +19,15 @@ interface AnalyticsFiltersProps {
 }
 
 export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: AnalyticsFiltersProps) {
+  const {
+    filters,
+    setFilters,
+    loading,
+    categories,
+    paymentMethods,
+    cashiers,
+  } = useAnalytics();
+
   return (
     <div className="flex flex-col gap-5 mb-8">
       {/* Header — matches dashboard style */}
@@ -34,16 +44,16 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <Button variant="outline" size="sm" onClick={onExportExcel} className="bg-background shadow-sm">
+          <Button variant="outline" size="sm" onClick={onExportExcel} className="bg-background shadow-sm" disabled={loading}>
             <Download className="mr-2 h-4 w-4" />
             Export Data
           </Button>
-          <Button variant="outline" size="sm" onClick={onExportCharts} className="bg-background shadow-sm">
+          <Button variant="outline" size="sm" onClick={onExportCharts} className="bg-background shadow-sm" disabled={loading}>
             <FileImage className="mr-2 h-4 w-4" />
             Export Charts
           </Button>
-          <Button variant="outline" size="sm" onClick={onRefresh} className="bg-background shadow-sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={onRefresh} className="bg-background shadow-sm" disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Refresh
           </Button>
         </div>
@@ -59,59 +69,86 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">From</span>
-              <Input type="date" className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm" />
+              <Input
+                type="date"
+                className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm"
+                value={filters.dateFrom}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))
+                }
+              />
             </div>
             <span className="text-muted-foreground/40">—</span>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">To</span>
-              <Input type="date" className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm" />
+              <Input
+                type="date"
+                className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm"
+                value={filters.dateTo}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, dateTo: e.target.value }))
+                }
+              />
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-w-[150px]">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</label>
-          <Select defaultValue="all">
+          <Select
+            value={filters.category}
+            onValueChange={(val) => setFilters((prev) => ({ ...prev, category: val ?? "all" }))}
+          >
             <SelectTrigger className="shadow-sm">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="coffee">Coffee</SelectItem>
-              <SelectItem value="non-coffee">Non-Coffee</SelectItem>
-              <SelectItem value="tea">Tea</SelectItem>
-              <SelectItem value="pastries">Pastries</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-w-[150px]">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Method</label>
-          <Select defaultValue="all">
+          <Select
+            value={filters.paymentMethod}
+            onValueChange={(val) => setFilters((prev) => ({ ...prev, paymentMethod: val ?? "all" }))}
+          >
             <SelectTrigger className="shadow-sm">
               <SelectValue placeholder="Select payment" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Methods</SelectItem>
-              <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="gcash">GCash</SelectItem>
-              <SelectItem value="maya">Maya</SelectItem>
-              <SelectItem value="bpi">BPI</SelectItem>
+              {paymentMethods.map((pm) => (
+                <SelectItem key={pm} value={pm}>
+                  {pm}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-w-[150px]">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cashier</label>
-          <Select defaultValue="all">
+          <Select
+            value={filters.cashier}
+            onValueChange={(val) => setFilters((prev) => ({ ...prev, cashier: val ?? "all" }))}
+          >
             <SelectTrigger className="shadow-sm">
               <SelectValue placeholder="Select cashier" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Cashiers</SelectItem>
-              <SelectItem value="sarah">Sarah</SelectItem>
-              <SelectItem value="mike">Mike</SelectItem>
-              <SelectItem value="alex">Alex</SelectItem>
+              {cashiers.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

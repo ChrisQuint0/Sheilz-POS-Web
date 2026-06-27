@@ -3,15 +3,45 @@
 import { Line, Bar } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultChartOptions, chartColors } from "./chart-setup";
-import { Clock, Calendar } from "lucide-react";
+import { Clock, Calendar, Loader2 } from "lucide-react";
+import { useAnalytics } from "../analytics-context";
 
 export function PeakActivity() {
+  const { data, loading } = useAnalytics();
+  
+  if (loading) {
+    return (
+      <>
+        <Card className="shadow-sm col-span-full lg:col-span-2 h-[380px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+        </Card>
+        <Card className="shadow-sm col-span-full lg:col-span-1 h-[380px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+        </Card>
+      </>
+    );
+  }
+
+  const peakHours = data.peakHours;
+  const peakDays = data.peakDays;
+
+  // Filter out 12AM to 5AM from the chart since it's mostly 0s, unless there are orders
+  // Find first non-zero and last non-zero to bound it, or use a default range like 6 AM - 8 PM
+  let startIdx = 6; // 6 AM
+  let endIdx = 20; // 8 PM
+  
+  const lineLabels = peakHours.slice(startIdx, endIdx + 1).map(h => h.hour_label);
+  const lineValues = peakHours.slice(startIdx, endIdx + 1).map(h => Number(h.order_count));
+
+  const peakHourValue = Math.max(...peakHours.map(h => Number(h.order_count)));
+  const peakHourLabel = peakHours.find(h => Number(h.order_count) === peakHourValue)?.hour_label || "";
+
   const lineData = {
-    labels: ["6 AM", "7 AM", "8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"],
+    labels: lineLabels,
     datasets: [
       {
         label: "Orders per Hour",
-        data: [5, 15, 42, 55, 38, 45, 60, 52, 40, 35, 48, 55],
+        data: lineValues,
         borderColor: chartColors.secondary,
         backgroundColor: chartColors.secondaryLight,
         fill: true,
@@ -34,12 +64,17 @@ export function PeakActivity() {
     },
   };
 
+  // Peak Days Data (already comes out as Sun-Sat)
+  // Usually Mon-Sun is better for display, but Sun-Sat is fine
+  const barLabels = peakDays.map(d => d.day_label);
+  const barValues = peakDays.map(d => d.total_sales);
+
   const barData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    labels: barLabels,
     datasets: [
       {
         label: "Sales (₱)",
-        data: [12000, 11500, 13000, 12800, 18000, 24000, 21000],
+        data: barValues,
         backgroundColor: chartColors.chart3,
         borderRadius: 6,
         borderSkipped: false,
@@ -87,12 +122,18 @@ export function PeakActivity() {
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Peak hour</p>
-            <p className="text-sm font-semibold text-foreground">12 PM · 60 orders</p>
+            <p className="text-sm font-semibold text-foreground">{peakHourLabel} · {peakHourValue} orders</p>
           </div>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] w-full">
-            <Line data={lineData} options={lineOptions as any} />
+            {peakHourValue > 0 ? (
+              <Line data={lineData} options={lineOptions as any} />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+                No hourly data available.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -109,7 +150,13 @@ export function PeakActivity() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px] w-full">
-            <Bar data={barData} options={barOptions as any} />
+            {peakDays.length > 0 ? (
+              <Bar data={barData} options={barOptions as any} />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+                No daily data available.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

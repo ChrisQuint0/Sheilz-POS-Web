@@ -1,5 +1,6 @@
 "use client";
 
+import { AnalyticsProvider, useAnalytics } from "./analytics-context";
 import { AnalyticsFilters } from "./components/analytics-filters";
 import { KpiCards } from "./components/kpi-cards";
 import { RevenueChart } from "./components/revenue-chart";
@@ -11,17 +12,19 @@ import { InventoryAnalytics } from "./components/inventory-analytics";
 import { OperationalInsights } from "./components/operational-insights";
 import { exportToExcel, exportChartsToPDF } from "./utils/export-utils";
 
-export default function AnalyticsPage() {
-  const handleRefresh = () => {
-    alert("Analytics data refreshed!");
+function AnalyticsDashboard() {
+  const { data, refresh } = useAnalytics();
+
+  const handleExportExcel = () => {
+    exportToExcel(data);
   };
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto">
       <AnalyticsFilters 
-        onExportExcel={exportToExcel}
+        onExportExcel={handleExportExcel}
         onExportCharts={exportChartsToPDF}
-        onRefresh={handleRefresh}
+        onRefresh={refresh}
       />
       
       <div id="analytics-dashboard-content">
@@ -48,5 +51,13 @@ export default function AnalyticsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AnalyticsPage() {
+  return (
+    <AnalyticsProvider>
+      <AnalyticsDashboard />
+    </AnalyticsProvider>
   );
 }

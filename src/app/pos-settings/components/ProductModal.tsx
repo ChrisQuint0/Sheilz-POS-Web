@@ -907,7 +907,7 @@ export function ProductModal({
                                           updateIngredient(
                                             item.ingredientId,
                                             "unit",
-                                            val,
+                                            val || "",
                                           )
                                         }
                                       >
