@@ -15,7 +15,7 @@ import { IngredientModal } from "./components/ingredient-modal";
 import { ReplenishModal } from "./components/replenish-modal";
 import { SettingsModal } from "./components/settings-modal";
 import { useProfile } from "@/components/profile-provider";
-
+import { ErrorModal } from "./components/error-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,6 +45,10 @@ export default function InventoryPage() {
     profile?.role === "Manager" || profile?.role === "Administrator";
 
   // State
+  const [errorModal, setErrorModal] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -244,7 +248,11 @@ export default function InventoryPage() {
       .eq("id", id);
 
     if (error) {
-      alert(`Failed to delete ingredient: ${error.message}`);
+      setErrorModal({
+        title: "Cannot Delete Ingredient",
+        message:
+          "This ingredient is used in one or more product recipes. Remove it from all recipes before deleting.",
+      });
       return;
     }
 
@@ -856,6 +864,16 @@ export default function InventoryPage() {
         onAddUnit={handleAddUnit}
         onDeleteUnit={handleDeleteUnit}
       />
+      {errorModal && (
+        <ErrorModal
+          open={!!errorModal}
+          onOpenChange={(open) => {
+            if (!open) setErrorModal(null);
+          }}
+          title={errorModal.title}
+          message={errorModal.message}
+        />
+      )}
     </div>
   );
 }
