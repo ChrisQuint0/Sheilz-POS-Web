@@ -515,7 +515,8 @@ export default function POSSettingsPage() {
   const handleProductDelete = (productId: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== productId));
     toast.success("Successfully Deleted", {
-      description: "The product has been successfully removed from your catalog.",
+      description:
+        "The product has been successfully removed from your catalog.",
     });
   };
 

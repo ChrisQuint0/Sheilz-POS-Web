@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import {
-  initialTransactions,
   InventoryItem,
   Category,
   Unit,
@@ -53,8 +52,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
-  const [transactions, setTransactions] =
-    useState<InventoryTransaction[]>(initialTransactions);
+  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
 
   // View state
   const [currentView, setCurrentView] = useState<"inventory" | "transactions">(
@@ -68,6 +66,7 @@ export default function InventoryPage() {
   // Modals state
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
   const [replenishModalOpen, setReplenishModalOpen] = useState(false);
   const [replenishItem, setReplenishItem] = useState<InventoryItem | null>(
@@ -103,7 +102,16 @@ export default function InventoryPage() {
         }
         setLoading(false);
       });
-
+    supabase
+      .from("payment_methods")
+      .select("name")
+      .eq("is_enabled", true)
+      .order("name")
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setPaymentMethods(data.map((row) => row.name));
+        }
+      });
     // Fetch categories
     supabase
       .from("inventory_categories")
@@ -123,6 +131,45 @@ export default function InventoryPage() {
       .then(({ data, error }) => {
         if (!error && data) {
           setUnits(data.map((row) => row.name as Unit));
+        }
+      });
+
+    //fetch inventory transactions
+    supabase
+      .from("inventory_transactions")
+      .select("*, profiles(display_name)")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setTransactions(
+            data.map((row) => ({
+              id: row.id,
+              ingredientId: row.inventory_item_id,
+              type: row.type,
+              previousStock: row.previous_stock,
+              quantityChanged: row.quantity_changed,
+              newStock: row.new_stock,
+              notes: row.notes,
+              userId: row.profiles?.display_name ?? row.user_id ?? undefined,
+              date: row.created_at,
+              expenseDetails:
+                row.delivery_cost != null ||
+                row.expense_payment_method != null ||
+                row.supplier != null ||
+                row.received_by != null ||
+                row.delivery_date != null ||
+                row.delivery_time != null
+                  ? {
+                      deliveryCost: row.delivery_cost,
+                      paymentMethod: row.expense_payment_method,
+                      supplier: row.supplier,
+                      receivedBy: row.received_by,
+                      deliveryDate: row.delivery_date,
+                      deliveryTime: row.delivery_time,
+                    }
+                  : undefined,
+            })),
+          );
         }
       });
   }, []);
@@ -265,7 +312,6 @@ export default function InventoryPage() {
     setReplenishModalOpen(true);
   };
 
-  // TODO: include userId in the transaction data.
   const handleSaveReplenishment = async (
     transactionData: Partial<InventoryTransaction>,
   ) => {
@@ -287,6 +333,7 @@ export default function InventoryPage() {
         supplier: transactionData.expenseDetails?.supplier ?? null,
         received_by: transactionData.expenseDetails?.receivedBy ?? null,
         delivery_date: transactionData.expenseDetails?.deliveryDate ?? null,
+        user_id: profile?.id ?? null,
         delivery_time: transactionData.expenseDetails?.deliveryTime ?? null,
       })
       .select()
@@ -806,7 +853,7 @@ export default function InventoryPage() {
                             {payment || "—"}
                           </td>
                           <td className="px-5 py-3.5 text-gray-500 text-[13px]">
-                            {txn.userId}
+                            {txn.userId ?? "—"}
                           </td>
                         </tr>
                       );
@@ -851,6 +898,7 @@ export default function InventoryPage() {
         onOpenChange={setReplenishModalOpen}
         item={replenishItem}
         onSave={handleSaveReplenishment}
+        paymentMethods={paymentMethods}
       />
 
       <SettingsModal
