@@ -61,6 +61,7 @@ export function IngredientModal({
   };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reasonForChange, setReasonForChange] = useState<string>("");
 
   const [formData, setFormData] = useState<Partial<InventoryItem>>({
     name: "",
@@ -77,6 +78,7 @@ export function IngredientModal({
     if (open) {
       setStep(1);
       setConfirmDelete(false);
+      setReasonForChange("");
       if (item) {
         setFormData({ ...item });
       } else {
@@ -99,9 +101,18 @@ export function IngredientModal({
   };
 
   const handleSave = () => {
-    onSave(formData);
+    onSave({ ...formData, reasonForChange } as any);
     onOpenChange(false);
   };
+
+  const stockFieldsChanged =
+    isEdit &&
+    item &&
+    (formData.currentStock !== item.currentStock ||
+      formData.maxCapacity !== item.maxCapacity ||
+      formData.lowStockThreshold !== item.lowStockThreshold);
+
+  const isSaveDisabled = stockFieldsChanged && !reasonForChange;
 
   const canProceedToStep2 =
     formData.name && formData.categoryId && formData.unit;
@@ -348,6 +359,31 @@ export function IngredientModal({
                       </span>
                     </div>
                   </div>
+
+                  {/* Reason for Change */}
+                  <div className="col-span-3 space-y-2 mt-2">
+                    <Label className="text-[13px] font-semibold text-[#3a2b27]">
+                      Reason for Change {stockFieldsChanged && <span className="text-[#C2456A]">*</span>}
+                    </Label>
+                    <Select
+                      value={reasonForChange}
+                      onValueChange={setReasonForChange}
+                    >
+                      <SelectTrigger className="h-10 bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20">
+                        <SelectValue placeholder="Select a reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Manual Adjustment">Manual Adjustment</SelectItem>
+                        <SelectItem value="Waste / Spoilage">Waste / Spoilage</SelectItem>
+                        <SelectItem value="Stock Correction">Stock Correction</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {stockFieldsChanged && !reasonForChange && (
+                      <p className="text-xs font-medium text-rose-500 mt-1">
+                        Reason for Change is required when updating stock information.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -431,6 +467,7 @@ export function IngredientModal({
             ) : (
               <Button
                 onClick={handleSave}
+                disabled={isSaveDisabled}
                 className="h-9 px-5 bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm text-[13px]"
               >
                 {isEdit ? "Save Changes" : "Create Ingredient"}
