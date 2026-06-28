@@ -34,6 +34,7 @@ import { AuthorizationModal } from "./components/authorization-modal";
 import { TransactionDrawer } from "./components/transaction-drawer";
 import { MobileTransactionCard } from "./components/mobile-transaction-card";
 import { format } from "date-fns";
+import { ExportModal } from "./components/export-modal";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useProfile } from "@/components/profile-provider";
 
@@ -67,6 +68,8 @@ export default function SalesHistoryPage() {
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [authModal, setAuthModal] = useState<{
     isOpen: boolean;
     actionType: "edit" | "delete";
@@ -179,25 +182,62 @@ export default function SalesHistoryPage() {
 
   // Actions
   const handleExport = useCallback(() => {
-    const rowsToExport = filteredTransactions.map((tx) => ({
-      "Order ID": tx.orderId,
-      "Date & Time": format(new Date(tx.createdAt), "MMM dd, yyyy h:mm a"),
-      Customer: tx.customerName,
-      Status: tx.status,
-      "Item/s": formatItems(tx.items),
-      Amount: tx.amount,
-      "Payment Method": tx.paymentMethod,
-      Cashier: tx.cashier,
-    }));
+    setIsExportModalOpen(true);
+  }, []);
 
-    const worksheet = XLSX.utils.json_to_sheet(rowsToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sales History");
-    XLSX.writeFile(
-      workbook,
-      `Sales_History_${format(new Date(), "yyyyMMdd")}.xlsx`,
-    );
-  }, [filteredTransactions]);
+  const triggerExport = async (startDate: string, endDate: string, preset: string) => {
+    setIsExporting(true);
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append("startDate", startDate);
+      if (endDate) queryParams.append("endDate", endDate);
+      if (globalFilter) queryParams.append("globalFilter", globalFilter);
+      if (statusFilter !== "All") queryParams.append("statusFilter", statusFilter);
+      if (paymentFilter !== "All") queryParams.append("paymentFilter", paymentFilter);
+      if (cashierFilter !== "All") queryParams.append("cashierFilter", cashierFilter);
+      queryParams.append("preset", preset);
+
+      const response = await fetch(`/api/export-sales?${queryParams.toString()}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          alert("No transactions found for the selected date range.");
+        } else {
+          const errorData = await response.json().catch(() => null);
+          alert(errorData?.error || "Failed to export data.");
+        }
+        setIsExporting(false);
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = "Sales_Report.xlsx";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch.length === 2) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("An error occurred during export.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleAddTransaction = (newTx: Omit<Transaction, "id">) => {
     const transaction: Transaction = {
@@ -574,6 +614,13 @@ export default function SalesHistoryPage() {
         onClose={() => setAuthModal({ ...authModal, isOpen: false })}
         onAuthorize={handleAuthorize}
         actionType={authModal.actionType}
+      />
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={triggerExport}
+        isLoading={isExporting}
       />
 
       <TransactionDrawer
