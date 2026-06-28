@@ -372,7 +372,7 @@ export function IngredientModal({
                       <SelectTrigger className="h-10 bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20">
                         <SelectValue placeholder="Select a reason" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent alignItemWithTrigger={false}>
                         <SelectItem value="Manual Adjustment">Manual Adjustment</SelectItem>
                         <SelectItem value="Waste / Spoilage">Waste / Spoilage</SelectItem>
                         <SelectItem value="Stock Correction">Stock Correction</SelectItem>
