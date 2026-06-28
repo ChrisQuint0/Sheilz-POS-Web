@@ -1,36 +1,5 @@
 import { Category, PaymentMethod, Product, Size, TemperatureOption, Ingredient } from './types';
 
-export const initialIngredients: Ingredient[] = [
-  { id: 'ing-1', name: 'Coffee Beans', unit: 'g' },
-  { id: 'ing-2', name: 'Milk', unit: 'ml' },
-  { id: 'ing-3', name: 'Whipping Cream', unit: 'ml' },
-  { id: 'ing-4', name: 'Condensed Milk', unit: 'ml' },
-  { id: 'ing-5', name: 'Matcha Powder', unit: 'g' },
-  { id: 'ing-6', name: 'Uji Matcha Powder', unit: 'g' },
-  { id: 'ing-7', name: 'Honey', unit: 'ml' },
-  { id: 'ing-8', name: 'Vanilla Syrup', unit: 'ml' },
-  { id: 'ing-9', name: 'French Vanilla Syrup', unit: 'ml' },
-  { id: 'ing-10', name: 'Hazelnut Syrup', unit: 'ml' },
-  { id: 'ing-11', name: 'Caramel Syrup', unit: 'ml' },
-  { id: 'ing-12', name: 'Salted Caramel Syrup', unit: 'ml' },
-  { id: 'ing-13', name: 'Butterscotch Syrup', unit: 'ml' },
-  { id: 'ing-14', name: 'White Chocolate Syrup', unit: 'ml' },
-  { id: 'ing-15', name: 'Strawberry Syrup', unit: 'ml' },
-  { id: 'ing-16', name: 'Strawberry Jam', unit: 'g' },
-  { id: 'ing-17', name: 'Blueberry Syrup', unit: 'ml' },
-  { id: 'ing-18', name: 'Blueberry Jam', unit: 'g' },
-  { id: 'ing-19', name: 'Lemon Syrup', unit: 'ml' },
-  { id: 'ing-20', name: 'Lemon Juice', unit: 'ml' },
-  { id: 'ing-21', name: 'Yuzu Lime Syrup', unit: 'ml' },
-  { id: 'ing-22', name: 'Chocolate Powder', unit: 'g' },
-  { id: 'ing-23', name: 'Chocolate Drizzle', unit: 'ml' },
-  { id: 'ing-24', name: 'Cinnamon Powder', unit: 'g' },
-  { id: 'ing-25', name: 'Salt', unit: 'g' },
-  { id: 'ing-26', name: 'Soda Water', unit: 'ml' },
-  { id: 'ing-27', name: 'Water', unit: 'ml' },
-  { id: 'ing-28', name: 'Ice', unit: 'g' },
-  { id: 'ing-29', name: 'Lemon Garnish', unit: 'pc' },
-];
 
 export const initialCategories: Category[] = [
   { id: 'cat-1', name: 'Coffee' },
