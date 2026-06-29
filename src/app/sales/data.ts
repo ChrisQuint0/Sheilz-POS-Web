@@ -6,6 +6,7 @@ export type OrderItem = {
   qty: number;
   size: string;
   temperature: string;
+  unitPrice: number;
 };
 
 export interface Transaction {
