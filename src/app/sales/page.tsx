@@ -84,55 +84,104 @@ export default function SalesHistoryPage() {
   // Responsive hook
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
+  // Updated fetch function with keyset pagination
   useEffect(() => {
     const supabase = createClient();
-    const fetchOrders = async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          `
-        *,
-        order_items (
-          name,
-          quantity,
-          size,
-          temperature
-        )
-      `,
-        )
-        .order("created_at", { ascending: false });
+    const fetchAllOrders = async () => {
+      setLoading(true);
+      try {
+        let allTransactions: Transaction[] = [];
+        let lastId: string | null = null;
+        let hasMore = true;
+        const batchSize = 1000;
 
-      if (error) {
-        alert(error.message);
+        while (hasMore) {
+          let query = supabase
+            .from("orders")
+            .select(
+              `
+              *,
+              order_items (
+                name,
+                quantity,
+                size,
+                temperature
+              )
+            `,
+            )
+            .order("id", { ascending: true })
+            .limit(batchSize);
+
+          // Apply keyset pagination - fetch records after the last ID
+          if (lastId) {
+            query = query.gt("id", lastId);
+          }
+
+          const { data, error } = await query;
+
+          if (error) {
+            console.error("Supabase error:", error);
+            alert(error.message);
+            setLoading(false);
+            return;
+          }
+
+          // If no data returned, we're done
+          if (!data || data.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          // Transform the data
+          const transactions: Transaction[] = data.map((order) => ({
+            id: order.id,
+            orderId: order.order_id,
+            customerName: order.customer_name,
+            status: order.status,
+            amount: order.amount,
+            paymentMethod: order.payment_method,
+            cashier: order.cashier_name,
+            createdBy: order.created_by ?? currentUser,
+            createdAt: order.created_at,
+            lastModifiedBy: order.last_modified_by ?? "",
+            lastModifiedAt: order.last_modified_at ?? "",
+            items: (order.order_items ?? []).map((i: any) => ({
+              name: i.name,
+              qty: i.quantity,
+              size: i.size ?? "",
+              temperature: i.temperature ?? "",
+            })),
+          }));
+
+          // Add to our collection
+          allTransactions = [...allTransactions, ...transactions];
+
+          // Update lastId for next batch (using the last record's ID)
+          const lastRecord = data[data.length - 1];
+          lastId = lastRecord.id;
+
+          // If we got less than batchSize, we've reached the end
+          if (data.length < batchSize) {
+            hasMore = false;
+          }
+        }
+
+        // Sort by created_at descending for display (newest first)
+        allTransactions.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+
+        setRowData(allTransactions);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        alert("An error occurred while fetching transactions.");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const transactions: Transaction[] = data.map((order) => ({
-        id: order.id,
-        orderId: order.order_id,
-        customerName: order.customer_name,
-        status: order.status,
-        amount: order.amount,
-        paymentMethod: order.payment_method,
-        cashier: order.cashier_name,
-        createdBy: order.created_by ?? currentUser,
-        createdAt: order.created_at,
-        lastModifiedBy: order.last_modified_by ?? "",
-        lastModifiedAt: order.last_modified_at ?? "",
-        items: (order.order_items ?? []).map((i) => ({
-          name: i.name,
-          qty: i.quantity,
-          size: i.size ?? "",
-          temperature: i.temperature ?? "",
-        })),
-      }));
-
-      setRowData(transactions);
-      setLoading(false);
     };
 
-    fetchOrders();
+    fetchAllOrders();
   }, []);
 
   // Apply filters to derive displayed data
@@ -185,20 +234,29 @@ export default function SalesHistoryPage() {
     setIsExportModalOpen(true);
   }, []);
 
-  const triggerExport = async (startDate: string, endDate: string, preset: string) => {
+  const triggerExport = async (
+    startDate: string,
+    endDate: string,
+    preset: string,
+  ) => {
     setIsExporting(true);
     try {
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append("startDate", startDate);
       if (endDate) queryParams.append("endDate", endDate);
       if (globalFilter) queryParams.append("globalFilter", globalFilter);
-      if (statusFilter !== "All") queryParams.append("statusFilter", statusFilter);
-      if (paymentFilter !== "All") queryParams.append("paymentFilter", paymentFilter);
-      if (cashierFilter !== "All") queryParams.append("cashierFilter", cashierFilter);
+      if (statusFilter !== "All")
+        queryParams.append("statusFilter", statusFilter);
+      if (paymentFilter !== "All")
+        queryParams.append("paymentFilter", paymentFilter);
+      if (cashierFilter !== "All")
+        queryParams.append("cashierFilter", cashierFilter);
       queryParams.append("preset", preset);
 
-      const response = await fetch(`/api/export-sales?${queryParams.toString()}`);
-      
+      const response = await fetch(
+        `/api/export-sales?${queryParams.toString()}`,
+      );
+
       if (!response.ok) {
         if (response.status === 404) {
           alert("No transactions found for the selected date range.");
@@ -214,7 +272,7 @@ export default function SalesHistoryPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      
+
       const contentDisposition = response.headers.get("Content-Disposition");
       let filename = "Sales_Report.xlsx";
       if (contentDisposition) {
@@ -223,7 +281,7 @@ export default function SalesHistoryPage() {
           filename = filenameMatch[1];
         }
       }
-      
+
       a.download = filename;
       document.body.appendChild(a);
       a.click();
