@@ -1,5 +1,5 @@
 export type OrderStatus = "Completed" | "Void (Not Made)" | "Void (Consumed)";
-export type PaymentMethod = "Cash" | "GCash" | "BPI" | "Maya";
+export type PaymentMethod = string;
 
 export type OrderItem = {
   name: string;

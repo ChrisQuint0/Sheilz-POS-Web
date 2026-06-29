@@ -39,6 +39,7 @@ interface AddTransactionModalProps {
   onClose: () => void;
   onSave: (transaction: Omit<Transaction, "id">) => Promise<void>;
   currentUser: string;
+  paymentMethods: string[];
 }
 
 export function AddTransactionModal({
@@ -46,6 +47,7 @@ export function AddTransactionModal({
   onClose,
   onSave,
   currentUser,
+  paymentMethods,
 }: AddTransactionModalProps) {
   const [customerName, setCustomerName] = useState("");
   const [status, setStatus] = useState<OrderStatus>("Completed");
@@ -492,10 +494,11 @@ export function AddTransactionModal({
                 <SelectValue placeholder="Select Payment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Cash">Cash</SelectItem>
-                <SelectItem value="GCash">GCash</SelectItem>
-                <SelectItem value="BPI">BPI</SelectItem>
-                <SelectItem value="Maya">Maya</SelectItem>
+                {paymentMethods.map((method) => (
+                  <SelectItem key={method} value={method}>
+                    {method}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

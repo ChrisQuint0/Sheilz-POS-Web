@@ -631,10 +631,11 @@ export default function SalesHistoryPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Payments</SelectItem>
-                <SelectItem value="Cash">Cash</SelectItem>
-                <SelectItem value="GCash">GCash</SelectItem>
-                <SelectItem value="BPI">BPI</SelectItem>
-                <SelectItem value="Maya">Maya</SelectItem>
+                {paymentMethods.map((method) => (
+                  <SelectItem key={method} value={method}>
+                    {method}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -729,29 +730,26 @@ export default function SalesHistoryPage() {
           </div>
         )}
       </div>
-
       {/* Modals & Drawers */}
       <AddTransactionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddTransaction}
         currentUser={currentUser}
+        paymentMethods={paymentMethods} // Add this line
       />
-
       <AuthorizationModal
         isOpen={authModal.isOpen}
         onClose={() => setAuthModal({ ...authModal, isOpen: false })}
         onAuthorize={handleAuthorize}
         actionType={authModal.actionType}
       />
-
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         onExport={triggerExport}
         isLoading={isExporting}
       />
-
       <TransactionDrawer
         transaction={drawerTx}
         isOpen={!!drawerTx}
