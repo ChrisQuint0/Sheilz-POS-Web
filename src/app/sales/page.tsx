@@ -77,6 +77,7 @@ export default function SalesHistoryPage() {
   }>({ isOpen: false, actionType: "delete" });
 
   // Drawer state
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [drawerTx, setDrawerTx] = useState<Transaction | null>(null);
 
   const currentUser = "Admin User";
@@ -87,6 +88,17 @@ export default function SalesHistoryPage() {
   // Updated fetch function with keyset pagination
   useEffect(() => {
     const supabase = createClient();
+    supabase
+      .from("payment_methods")
+      .select("name")
+      .eq("is_enabled", true)
+      .order("name")
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setPaymentMethods(data.map((row) => row.name));
+        }
+      });
+
     const fetchAllOrders = async () => {
       setLoading(true);
       try {
@@ -150,6 +162,7 @@ export default function SalesHistoryPage() {
               qty: i.quantity,
               size: i.size ?? "",
               temperature: i.temperature ?? "",
+              unitPrice: i.unit_price ?? 0,
             })),
           }));
 
@@ -297,10 +310,56 @@ export default function SalesHistoryPage() {
     }
   };
 
-  const handleAddTransaction = (newTx: Omit<Transaction, "id">) => {
+  const handleAddTransaction = async (newTx: Omit<Transaction, "id">) => {
+    const supabase = createClient();
+
+    // Step 1 — INSERT into orders
+    const { data: orderData, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        order_id: newTx.orderId,
+        customer_name: newTx.customerName,
+        status: newTx.status,
+        amount: newTx.amount,
+        payment_method: newTx.paymentMethod,
+        cashier_name: newTx.cashier,
+        // created_by / last_modified_by left null until auth/RBAC provides a UUID
+      })
+      .select("id, order_id, created_at")
+      .single();
+
+    if (orderError) {
+      alert(`Failed to save order: ${orderError.message}`);
+      return;
+    }
+
+    // Step 2 — INSERT into order_items
+    const orderItemRows = newTx.items.map((item) => ({
+      order_id: orderData.id,
+      name: item.name,
+      size: item.size || null,
+      temperature: item.temperature || null,
+      quantity: item.qty,
+      unit_price: item.unitPrice,
+      subtotal: item.unitPrice * item.qty,
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .insert(orderItemRows);
+
+    if (itemsError) {
+      alert(`Order saved but failed to save items: ${itemsError.message}`);
+      // Order row already committed; skip local state update to avoid inconsistency
+      return;
+    }
+
+    // Step 3 — Prepend to local state using real DB id and created_at
     const transaction: Transaction = {
       ...newTx,
-      id: `tx-${Date.now()}`,
+      id: orderData.id,
+      orderId: orderData.order_id,
+      createdAt: orderData.created_at,
     };
     setRowData((prev) => [transaction, ...prev]);
     setIsAddModalOpen(false);
@@ -314,7 +373,7 @@ export default function SalesHistoryPage() {
     setAuthModal({ isOpen: true, actionType: "edit", targetTx: tx });
   };
 
-  const handleAuthorize = () => {
+  const handleAuthorize = async () => {
     const { actionType, targetTx } = authModal;
 
     if (actionType === "delete" && targetTx) {
@@ -327,20 +386,32 @@ export default function SalesHistoryPage() {
       }
       setSelectedRows([]);
     } else if (actionType === "edit" && targetTx && !Array.isArray(targetTx)) {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          customer_name: targetTx.customerName,
+          status: targetTx.status,
+          payment_method: targetTx.paymentMethod,
+          last_modified_at: new Date().toISOString(),
+        })
+        .eq("id", targetTx.id);
+
+      if (error) {
+        alert(`Failed to save changes: ${error.message}`);
+        setAuthModal({ isOpen: false, actionType: "delete" });
+        return;
+      }
+
+      const updated = {
+        ...targetTx,
+        lastModifiedBy: currentUser,
+        lastModifiedAt: new Date().toISOString(),
+      };
       setRowData((prev) =>
-        prev.map((tx) => {
-          if (tx.id === targetTx.id) {
-            const updated = {
-              ...targetTx,
-              lastModifiedBy: currentUser,
-              lastModifiedAt: new Date().toISOString(),
-            };
-            if (drawerTx?.id === tx.id) setDrawerTx(updated);
-            return updated;
-          }
-          return tx;
-        }),
+        prev.map((tx) => (tx.id === targetTx.id ? updated : tx)),
       );
+      if (drawerTx?.id === targetTx.id) setDrawerTx(updated);
     }
 
     setAuthModal({ isOpen: false, actionType: "delete" });
@@ -687,6 +758,7 @@ export default function SalesHistoryPage() {
         onClose={() => setDrawerTx(null)}
         onEdit={requestEdit}
         onDelete={requestDelete}
+        paymentMethods={paymentMethods}
       />
     </>
   );
