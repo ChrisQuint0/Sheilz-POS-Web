@@ -4,15 +4,19 @@ export interface Product {
   id: string;
   name: string;
   categoryId: string;
-  type: ProductType;
+  type: string;
   image?: string;
   description?: string;
-  sizes: string[]; // size ids
-  temperatures: string[]; // temp ids
-  prices: Record<string, number>;
   hasRecipe: boolean;
-  recipes: Record<string, { ingredientId: string; quantity: string; unit: string }[]>;
   isVisible: boolean;
+  sizes: string[];
+  temperatures: string[];
+  prices: Record<string, number>;
+  recipes: Record<
+    string,
+    Array<{ ingredientId: string; quantity: string; unit: string }>
+  >;
+  archivedAt?: string; 
 }
 
 export interface Ingredient {

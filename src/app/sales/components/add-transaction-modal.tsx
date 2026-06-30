@@ -19,10 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2 } from "lucide-react";
 import { OrderStatus, PaymentMethod, Transaction, OrderItem } from "../data";
-import { PRODUCT_CATALOG } from "./product-catalog";
+import { Product } from "./product-catalog";
 
 interface FormOrderItem {
   id: string;
@@ -31,7 +30,6 @@ interface FormOrderItem {
   temp: string | null;
   qty: number;
   unitPrice: number;
-  selectedAddons: string[];
 }
 
 interface AddTransactionModalProps {
@@ -40,6 +38,7 @@ interface AddTransactionModalProps {
   onSave: (transaction: Omit<Transaction, "id">) => Promise<void>;
   currentUser: string;
   paymentMethods: string[];
+  products: Product[];
 }
 
 export function AddTransactionModal({
@@ -48,6 +47,7 @@ export function AddTransactionModal({
   onSave,
   currentUser,
   paymentMethods,
+  products,
 }: AddTransactionModalProps) {
   const [customerName, setCustomerName] = useState("");
   const [status, setStatus] = useState<OrderStatus>("Completed");
@@ -57,17 +57,7 @@ export function AddTransactionModal({
   const [items, setItems] = useState<FormOrderItem[]>([]);
 
   const totalAmount = useMemo(() => {
-    return items.reduce((acc, item) => {
-      let itemPrice = item.unitPrice;
-      const product = PRODUCT_CATALOG.find((p) => p.name === item.productName);
-      if (product?.addons) {
-        item.selectedAddons.forEach((addonName) => {
-          const addon = product.addons!.find((a) => a.name === addonName);
-          if (addon) itemPrice += addon.price;
-        });
-      }
-      return acc + itemPrice * item.qty;
-    }, 0);
+    return items.reduce((acc, item) => acc + item.unitPrice * item.qty, 0);
   }, [items]);
 
   const handleAddItem = () => {
@@ -80,7 +70,6 @@ export function AddTransactionModal({
         temp: null,
         qty: 1,
         unitPrice: 0,
-        selectedAddons: [],
       },
     ]);
   };
@@ -89,27 +78,21 @@ export function AddTransactionModal({
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-
         const updated = { ...item, [field]: value };
-
         if (field === "productName") {
-          const product = PRODUCT_CATALOG.find((p) => p.name === value);
+          const product = products.find((p) => p.name === value);
           if (product && product.variants.length > 0) {
             const firstVariant = product.variants[0];
             updated.size = firstVariant.size;
             updated.temp = firstVariant.temp;
             updated.unitPrice = firstVariant.price;
-            updated.selectedAddons = [];
           } else {
             updated.size = null;
             updated.temp = null;
             updated.unitPrice = 0;
-            updated.selectedAddons = [];
           }
         } else if (field === "size" || field === "temp") {
-          const product = PRODUCT_CATALOG.find(
-            (p) => p.name === updated.productName,
-          );
+          const product = products.find((p) => p.name === updated.productName);
           if (product) {
             const variant = product.variants.find(
               (v) =>
@@ -123,7 +106,6 @@ export function AddTransactionModal({
             }
           }
         }
-
         return updated;
       }),
     );
@@ -141,29 +123,13 @@ export function AddTransactionModal({
     );
     const orderId = `${yyyy}${mm}${dd}-${randomSuffix}`;
 
-    const parsedItems: OrderItem[] = items.map((item) => {
-      let finalName = item.productName;
-      let itemPrice = item.unitPrice;
-      if (item.selectedAddons.length > 0) {
-        finalName += ` (${item.selectedAddons.join(", ")})`;
-        const product = PRODUCT_CATALOG.find(
-          (p) => p.name === item.productName,
-        );
-        if (product?.addons) {
-          item.selectedAddons.forEach((addonName) => {
-            const addon = product.addons!.find((a) => a.name === addonName);
-            if (addon) itemPrice += addon.price;
-          });
-        }
-      }
-      return {
-        name: finalName,
-        size: item.size ?? "",
-        temperature: item.temp ?? "",
-        qty: item.qty,
-        unitPrice: itemPrice,
-      };
-    });
+    const parsedItems: OrderItem[] = items.map((item) => ({
+      name: item.productName,
+      size: item.size ?? "",
+      temperature: item.temp ?? "",
+      qty: item.qty,
+      unitPrice: item.unitPrice,
+    }));
 
     const finalCustomerName =
       customerName.trim() === "" ? "Walk-In" : customerName;
@@ -206,7 +172,7 @@ export function AddTransactionModal({
   };
 
   const productCategories = Array.from(
-    new Set(PRODUCT_CATALOG.map((p) => p.category)),
+    new Set(products.map((p) => p.category)),
   );
 
   return (
@@ -274,7 +240,7 @@ export function AddTransactionModal({
                 </div>
               )}
               {items.map((item, index) => {
-                const product = PRODUCT_CATALOG.find(
+                const product = products.find(
                   (p) => p.name === item.productName,
                 );
 
@@ -295,15 +261,7 @@ export function AddTransactionModal({
                   ),
                 ) as string[];
 
-                let itemPrice = item.unitPrice;
-                if (product?.addons) {
-                  item.selectedAddons.forEach((addonName) => {
-                    const addon = product.addons!.find(
-                      (a) => a.name === addonName,
-                    );
-                    if (addon) itemPrice += addon.price;
-                  });
-                }
+                const itemPrice = item.unitPrice;
                 const subtotal = itemPrice * item.qty;
 
                 return (
@@ -345,13 +303,13 @@ export function AddTransactionModal({
                             {productCategories.map((category) => (
                               <SelectGroup key={category}>
                                 <SelectLabel>{category}</SelectLabel>
-                                {PRODUCT_CATALOG.filter(
-                                  (p) => p.category === category,
-                                ).map((p) => (
-                                  <SelectItem key={p.name} value={p.name}>
-                                    {p.name}
-                                  </SelectItem>
-                                ))}
+                                {products
+                                  .filter((p) => p.category === category)
+                                  .map((p) => (
+                                    <SelectItem key={p.name} value={p.name}>
+                                      {p.name}
+                                    </SelectItem>
+                                  ))}
                               </SelectGroup>
                             ))}
                           </SelectContent>
@@ -438,44 +396,6 @@ export function AddTransactionModal({
                         </div>
                       </div>
                     </div>
-
-                    {/* Addons */}
-                    {product?.addons && product.addons.length > 0 && (
-                      <div className="flex flex-wrap gap-4 mt-2 bg-muted/30 p-2 rounded-md border border-border/50">
-                        {product.addons.map((addon) => (
-                          <div
-                            key={addon.name}
-                            className="flex items-center space-x-2"
-                          >
-                            <Checkbox
-                              id={`${item.id}-${addon.name}`}
-                              checked={item.selectedAddons.includes(addon.name)}
-                              onCheckedChange={(checked) => {
-                                const newAddons = checked
-                                  ? [...item.selectedAddons, addon.name]
-                                  : item.selectedAddons.filter(
-                                      (a) => a !== addon.name,
-                                    );
-                                updateItem(
-                                  item.id,
-                                  "selectedAddons",
-                                  newAddons,
-                                );
-                              }}
-                            />
-                            <Label
-                              htmlFor={`${item.id}-${addon.name}`}
-                              className="text-xs cursor-pointer font-normal"
-                            >
-                              {addon.name}{" "}
-                              <span className="text-muted-foreground">
-                                (+₱{addon.price.toFixed(2)})
-                              </span>
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 );
               })}

@@ -37,6 +37,7 @@ import { format } from "date-fns";
 import { ExportModal } from "./components/export-modal";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useProfile } from "@/components/profile-provider";
+import { Product } from "./components/product-catalog";
 
 function formatItems(items: OrderItem[]): string {
   return items
@@ -78,14 +79,13 @@ export default function SalesHistoryPage() {
 
   // Drawer state
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [drawerTx, setDrawerTx] = useState<Transaction | null>(null);
 
   const currentUser = "Admin User";
 
-  // Responsive hook
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
-  // Updated fetch function with keyset pagination
   useEffect(() => {
     const supabase = createClient();
     supabase
@@ -98,6 +98,39 @@ export default function SalesHistoryPage() {
           setPaymentMethods(data.map((row) => row.name));
         }
       });
+
+    supabase
+      .from("products")
+      .select(
+        `
+    name,
+    product_categories ( name ),
+    product_variants (
+      price,
+      sizes ( name ),
+      temperatures ( name )
+    )
+  `,
+      )
+      .eq("is_visible", true)
+      .is("archived_at", null) // Add this filter
+      .order("name")
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const mapped: Product[] = data.map((p: any) => ({
+            name: p.name,
+            category: p.product_categories?.name ?? "Other",
+            variants: (p.product_variants ?? []).map((v: any) => ({
+              size: v.sizes?.name ?? null,
+              temp: v.temperatures?.name ?? null,
+              price: v.price,
+            })),
+          }));
+          setProducts(mapped);
+        }
+      });
+
+    // Removed the duplicate products query here
 
     const fetchAllOrders = async () => {
       setLoading(true);
@@ -736,7 +769,8 @@ export default function SalesHistoryPage() {
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddTransaction}
         currentUser={currentUser}
-        paymentMethods={paymentMethods} // Add this line
+        paymentMethods={paymentMethods}
+        products={products}
       />
       <AuthorizationModal
         isOpen={authModal.isOpen}
