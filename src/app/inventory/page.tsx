@@ -205,7 +205,7 @@ export default function InventoryPage() {
   };
 
   const handleSaveIngredient = async (
-    ingredientData: Partial<InventoryItem>,
+    ingredientData: Partial<InventoryItem> & { reasonForChange?: string },
   ) => {
     if (selectedItem) {
       // Edit
@@ -247,6 +247,42 @@ export default function InventoryPage() {
       setItems((prev) =>
         prev.map((i) => (i.id === selectedItem.id ? updatedItem : i)),
       );
+
+      // Log a transaction if currentStock actually changed
+      const newStock = ingredientData.currentStock;
+      if (newStock !== undefined && newStock !== selectedItem.currentStock) {
+        const { data: txnData, error: txnError } = await supabase
+          .from("inventory_transactions")
+          .insert({
+            inventory_item_id: selectedItem.id,
+            type: ingredientData.reasonForChange,
+            previous_stock: selectedItem.currentStock,
+            quantity_changed: newStock - selectedItem.currentStock,
+            new_stock: newStock,
+            user_id: profile?.id ?? null,
+          })
+          .select()
+          .single();
+
+        if (txnError) {
+          alert(
+            `Ingredient updated but failed to log the stock change: ${txnError.message}`,
+          );
+        } else {
+          const newTxn: InventoryTransaction = {
+            id: txnData.id,
+            ingredientId: txnData.inventory_item_id,
+            type: txnData.type,
+            previousStock: txnData.previous_stock,
+            quantityChanged: txnData.quantity_changed,
+            newStock: txnData.new_stock,
+            notes: txnData.notes,
+            userId: profile?.id ?? "",
+            date: txnData.created_at,
+          };
+          setTransactions((prev) => [newTxn, ...prev]);
+        }
+      }
     } else {
       // Create
       const supabase = createClient();

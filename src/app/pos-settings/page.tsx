@@ -26,10 +26,12 @@ import {
   ShoppingBag,
   Filter,
   Check,
+  Archive,
 } from "lucide-react";
 import { ProductCard } from "./components/ProductCard";
 import { ProductModal } from "./components/ProductModal";
 import { MoreSettingsModal } from "./components/MoreSettingsModal";
+import { ArchivedProductsModal } from "./components/ArchivedProductsModal";
 import { Product, Category, Ingredient } from "./types";
 import { createClient } from "@/app/lib/supabase/client";
 import { toast } from "sonner";
@@ -48,6 +50,7 @@ export default function POSSettingsPage() {
   const [temperatures, setTemperatures] = useState(initialTemperatures);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -64,7 +67,7 @@ export default function POSSettingsPage() {
           variantsRes,
           recipesRes,
         ] = await Promise.all([
-          supabase.from("products").select("*"),
+          supabase.from("products").select("*").is("archived_at", null), // Only fetch non-archived products
           supabase.from("product_categories").select("id, name").order("name"),
           supabase
             .from("payment_methods")
@@ -512,12 +515,124 @@ export default function POSSettingsPage() {
     setIsModalOpen(true);
   };
 
-  const handleProductDelete = (productId: string) => {
+  const handleArchiveProduct = async (productId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("products")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", productId);
+
+    if (error) {
+      alert("Failed to archive product: " + error.message);
+      return;
+    }
+
     setProducts((prev) => prev.filter((p) => p.id !== productId));
-    toast.success("Successfully Deleted", {
+    toast.success("Product Archived", {
       description:
-        "The product has been successfully removed from your catalog.",
+        "The product has been removed from the active catalog. Sales history and recipes are preserved.",
     });
+  };
+
+  const handleUnarchiveProduct = async (productId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("products")
+      .update({ archived_at: null })
+      .eq("id", productId);
+
+    if (error) {
+      console.error("Failed to unarchive product:", error);
+      throw error;
+    }
+
+    // Refresh the main product list to include the restored product
+    const { data: restoredProduct, error: fetchError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .single();
+
+    if (fetchError) {
+      console.error("Failed to fetch restored product:", fetchError);
+      return;
+    }
+
+    // Add back to products list with proper relations
+    if (restoredProduct) {
+      // Fetch variants and recipes for this product
+      const [variantsRes, recipesRes] = await Promise.all([
+        supabase
+          .from("product_variants")
+          .select("id, product_id, size_id, temperature_id, price")
+          .eq("product_id", productId),
+        supabase
+          .from("product_recipes")
+          .select(
+            "id, product_id, variant_id, inventory_item_id, quantity, unit",
+          )
+          .eq("product_id", productId),
+      ]);
+
+      const variants = variantsRes.data || [];
+      const recipes = recipesRes.data || [];
+
+      // Build product with relations
+      const productSizes: string[] = [];
+      const productTemps: string[] = [];
+      const prices: Record<string, number> = {};
+      const productRecipes: Record<
+        string,
+        Array<{ ingredientId: string; quantity: string; unit: string }>
+      > = {};
+
+      variants.forEach((variant: any) => {
+        const sizeKey = variant.size_id || "null";
+        const tempKey = variant.temperature_id || "null";
+        const comboKey = `${sizeKey}_${tempKey}`;
+
+        if (variant.size_id && !productSizes.includes(variant.size_id)) {
+          productSizes.push(variant.size_id);
+        }
+        if (
+          variant.temperature_id &&
+          !productTemps.includes(variant.temperature_id)
+        ) {
+          productTemps.push(variant.temperature_id);
+        }
+
+        prices[comboKey] = variant.price;
+
+        const variantRecipes = recipes.filter(
+          (r: any) => r.variant_id === variant.id,
+        );
+
+        if (variantRecipes.length > 0) {
+          productRecipes[comboKey] = variantRecipes.map((r: any) => ({
+            ingredientId: r.inventory_item_id,
+            quantity: String(r.quantity),
+            unit: r.unit || "",
+          }));
+        }
+      });
+
+      const restoredProductData: Product = {
+        id: restoredProduct.id,
+        name: restoredProduct.name,
+        categoryId: restoredProduct.category_id,
+        type: restoredProduct.type,
+        image: restoredProduct.image_url ?? undefined,
+        description: restoredProduct.description ?? undefined,
+        hasRecipe: restoredProduct.has_recipe,
+        isVisible: restoredProduct.is_visible,
+        sizes: productSizes,
+        temperatures: productTemps,
+        prices: prices,
+        recipes: productRecipes,
+      };
+
+      setProducts((prev) => [...prev, restoredProductData]);
+    }
   };
 
   return (
@@ -544,14 +659,24 @@ export default function POSSettingsPage() {
                 </p>
               </div>
 
-              <Button
-                variant="outline"
-                className="shrink-0 bg-background self-start sm:self-auto"
-                onClick={() => setIsSettingsModalOpen(true)}
-              >
-                <Settings2 className="w-4 h-4 mr-2" />
-                More Settings
-              </Button>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  className="bg-background self-start sm:self-auto border-[#C2456A]/20 text-[#C2456A] hover:bg-[#FBE4EA] hover:border-[#C2456A]"
+                  onClick={() => setIsArchivedModalOpen(true)}
+                >
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archived Products
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-background self-start sm:self-auto"
+                  onClick={() => setIsSettingsModalOpen(true)}
+                >
+                  <Settings2 className="w-4 h-4 mr-2" />
+                  More Settings
+                </Button>
+              </div>
             </div>
 
             {/* Stats + Actions Row */}
@@ -715,7 +840,7 @@ export default function POSSettingsPage() {
             temperatures={temperatures}
             ingredientsList={ingredients}
             onSave={handleProductSave}
-            onDelete={handleProductDelete}
+            onArchive={handleArchiveProduct}
           />
 
           <MoreSettingsModal
@@ -729,6 +854,12 @@ export default function POSSettingsPage() {
             setSizes={setSizes}
             temperatures={temperatures}
             setTemperatures={setTemperatures}
+          />
+          <ArchivedProductsModal
+            open={isArchivedModalOpen}
+            onOpenChange={setIsArchivedModalOpen}
+            onUnarchive={handleUnarchiveProduct}
+            categories={categories}
           />
         </>
       )}
