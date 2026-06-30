@@ -367,7 +367,7 @@ export function IngredientModal({
                     </Label>
                     <Select
                       value={reasonForChange}
-                      onValueChange={setReasonForChange}
+                      onValueChange={(val) => setReasonForChange(val ?? "")}
                     >
                       <SelectTrigger className="h-10 bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20">
                         <SelectValue placeholder="Select a reason" />

@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ShoppingBag,
   CreditCard,
@@ -10,6 +14,8 @@ import {
   ArrowDownRight,
   Package,
   Coffee,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -22,6 +28,8 @@ import {
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
+import { createClient } from "@/app/lib/supabase/client";
+import { useProfile } from "@/components/profile-provider";
 
 ChartJS.register(
   CategoryScale,
@@ -33,27 +41,48 @@ ChartJS.register(
   Filler,
 );
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const chartData = {
-  labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-  datasets: [
-    {
-      fill: true,
-      label: "Revenue",
-      data: [8200, 9400, 11000, 10500, 12450, 14200, 13100],
-      borderColor: "#C2456A",
-      backgroundColor: "rgba(194, 69, 106, 0.12)",
-      tension: 0.4,
-      borderWidth: 2.5,
-      pointRadius: 4,
-      pointHoverRadius: 6,
-      pointBackgroundColor: "#C2456A",
-      pointBorderColor: "#ffffff",
-      pointBorderWidth: 2,
-    },
-  ],
-};
+interface DashboardKpis {
+  today_revenue: number;
+  today_orders: number;
+  today_avg_order: number;
+  yesterday_revenue: number;
+  yesterday_orders: number;
+  yesterday_avg_order: number;
+  revenue_change: number;
+  orders_change: number;
+  aov_change: number;
+}
+
+interface RevenueTrendDay {
+  day_label: string;
+  day_date: string;
+  total_revenue: number;
+}
+
+interface LowStockItem {
+  item_id: string;
+  item_name: string;
+  category_name: string;
+  current_stock: number;
+  low_stock_threshold: number;
+  unit: string;
+}
+
+interface AuditLogEntry {
+  id: string;
+  user_name: string;
+  user_role: string;
+  category: string;
+  action: string;
+  target_name: string | null;
+  target_type: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+// ─── Chart Options ────────────────────────────────────────────────────────────
 
 const chartOptions = {
   responsive: true,
@@ -90,67 +119,6 @@ const chartOptions = {
   },
 };
 
-const recentActivity = [
-  {
-    id: 1,
-    initials: "JT",
-    user: "Joshua T.",
-    action: "completed 5 orders",
-    time: "2 minutes ago",
-    detail: "ORD-2026-00480 → 00484",
-    count: 5,
-    color: "bg-[#fbe4ea] text-[#C2456A]",
-  },
-  {
-    id: 2,
-    initials: "MR",
-    user: "Maria R.",
-    action: "updated inventory",
-    time: "14 minutes ago",
-    detail: "Caramel Syrup · +48 units",
-    count: 1,
-    color: "bg-[#fce5d2] text-[#e08a4f]",
-  },
-  {
-    id: 3,
-    initials: "AL",
-    user: "Admin",
-    action: "added a new menu item",
-    time: "31 minutes ago",
-    detail: "Iced Brown Sugar Latte · ₱185.00",
-    count: 1,
-    color: "bg-[#e8f4e8] text-[#4f9a5c]",
-  },
-  {
-    id: 4,
-    initials: "JT",
-    user: "Joshua T.",
-    action: "voided an order",
-    time: "52 minutes ago",
-    detail: "ORD-2026-00471 · ₱340.00",
-    count: 1,
-    color: "bg-[#fbe4ea] text-[#C2456A]",
-  },
-];
-
-const lowStockItems = [
-  { id: 1, name: "Oat Milk (1L)", sku: "MLK-OAT-1L", stock: 4, threshold: 10 },
-  {
-    id: 2,
-    name: "Brown Sugar Syrup",
-    sku: "SYR-BRN-500",
-    stock: 2,
-    threshold: 8,
-  },
-  {
-    id: 3,
-    name: "Cold Brew Concentrate",
-    sku: "BRW-CLD-1L",
-    stock: 6,
-    threshold: 12,
-  },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function stockSeverity(stock: number, threshold: number) {
@@ -181,9 +149,185 @@ function getTodayLabel() {
   });
 }
 
+function timeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+
+  return date.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+const categoryColors: Record<string, string> = {
+  Sales: "bg-[#fbe4ea] text-[#C2456A]",
+  Inventory: "bg-[#fce5d2] text-[#e08a4f]",
+  Products: "bg-[#e8f4e8] text-[#4f9a5c]",
+  Authentication: "bg-[#e0e7ff] text-[#6366f1]",
+  "Team Management": "bg-[#dbeafe] text-[#3b82f6]",
+  Analytics: "bg-[#fef3c7] text-[#d97706]",
+  System: "bg-[#f1f5f9] text-[#64748b]",
+};
+
+function formatCurrency(value: number): { whole: string; decimal: string } {
+  const formatted = value.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const parts = formatted.split(".");
+  return { whole: parts[0], decimal: `.${parts[1]}` };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { profile } = useProfile();
+  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
+  const [revenueTrend, setRevenueTrend] = useState<RevenueTrendDay[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
+  const [stockAlertCount, setStockAlertCount] = useState(0);
+  const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
+  const [exporting, setExporting] = useState(false);
+
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+
+    try {
+      const [kpisRes, trendRes, lowStockRes, alertCountRes, activityRes] =
+        await Promise.all([
+          supabase.rpc("get_dashboard_kpis"),
+          supabase.rpc("get_dashboard_revenue_trend"),
+          supabase.rpc("get_low_stock_items", { p_limit: 3 }),
+          supabase.rpc("get_stock_alert_count"),
+          supabase
+            .from("audit_logs")
+            .select(
+              "id, user_name, user_role, category, action, target_name, target_type, details, created_at",
+            )
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ]);
+
+      if (kpisRes.data) setKpis(kpisRes.data as DashboardKpis);
+      if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
+      if (lowStockRes.data) setLowStockItems(lowStockRes.data as LowStockItem[]);
+      if (alertCountRes.data !== null && alertCountRes.data !== undefined)
+        setStockAlertCount(alertCountRes.data as number);
+      if (activityRes.data) setRecentActivity(activityRes.data as AuditLogEntry[]);
+
+      // Log errors for debugging
+      if (kpisRes.error) console.error("KPIs error:", kpisRes.error);
+      if (trendRes.error) console.error("Revenue trend error:", trendRes.error);
+      if (lowStockRes.error) console.error("Low stock error:", lowStockRes.error);
+      if (alertCountRes.error) console.error("Alert count error:", alertCountRes.error);
+      if (activityRes.error) console.error("Activity error:", activityRes.error);
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Build chart data from revenue trend
+  const chartData = {
+    labels: revenueTrend.map((d) => d.day_label),
+    datasets: [
+      {
+        fill: true,
+        label: "Revenue",
+        data: revenueTrend.map((d) => Number(d.total_revenue)),
+        borderColor: "#C2456A",
+        backgroundColor: "rgba(194, 69, 106, 0.12)",
+        tension: 0.4,
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: "#C2456A",
+        pointBorderColor: "#ffffff",
+        pointBorderWidth: 2,
+      },
+    ],
+  };
+
+  // Find peak day
+  const peakDay = revenueTrend.reduce<RevenueTrendDay | null>(
+    (max, d) => (!max || Number(d.total_revenue) > Number(max.total_revenue) ? d : max),
+    null,
+  );
+
+  const handleRestrictedLinkClick = (e: React.MouseEvent, path: string) => {
+    if (profile?.role === "Cashier") {
+      e.preventDefault();
+      toast.error("Insufficient Privileges: Your account does not have access to this section.");
+      return;
+    }
+    if (profile?.role === "Manager" && path === "/audit") {
+      e.preventDefault();
+      toast.error("Insufficient Privileges: Your account does not have access to this section.");
+    }
+  };
+
+  // Export handler
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const res = await fetch(
+        `/api/export-sales?startDate=${today}&endDate=${today}&preset=Today`,
+      );
+      if (!res.ok) {
+        // If no data found or error, show alert
+        const msg = await res.json().catch(() => ({}));
+        toast.error(msg.message || msg.error || "Export failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Dashboard_Export_${today}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Export failed. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Display name
+  const displayName = profile?.display_name
+    ? profile.display_name.split(" ")[0]
+    : "there";
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto">
       {/* Header */}
@@ -193,23 +337,41 @@ export default function Dashboard() {
             {getTodayLabel()}
           </p>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            {getGreeting()}, Sheilz <Coffee className="h-7 w-7 text-[#C2456A]" />
+            {getGreeting()}, {displayName}{" "}
+            <Coffee className="h-7 w-7 text-[#C2456A]" />
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Here's how the store is doing today.
+            Here&apos;s how the store is doing today.
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="shrink-0 bg-background self-start sm:self-auto"
-        >
-          Export Data
-        </Button>
+        <div className="flex gap-2 shrink-0 self-start sm:self-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="bg-background"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            className="bg-background"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            <Download className={`h-4 w-4 mr-1.5 ${exporting ? "animate-pulse" : ""}`} />
+            {exporting ? "Exporting..." : "Export Data"}
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        {/* Hero card — Total Revenue gets the brand treatment */}
+        {/* Total Revenue */}
         <Card className="shadow-sm lg:col-span-1 bg-[#C2456A] border-[#C2456A] text-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-xs font-medium text-white/70">
@@ -220,20 +382,37 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-1">
-            <div className="text-4xl font-bold tracking-tight leading-none mb-2">
-              12,450
-              <span className="text-xl font-normal opacity-70">.00</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center text-xs font-semibold bg-white/20 text-white rounded-full px-2 py-0.5">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +14.5%
-              </span>
-              <span className="text-xs text-white/60">vs. yesterday</span>
-            </div>
+            {loading ? (
+              <>
+                <Skeleton className="h-10 w-36 mb-2 bg-white/20" />
+                <Skeleton className="h-5 w-28 bg-white/20" />
+              </>
+            ) : (
+              <>
+                <div className="text-4xl font-bold tracking-tight leading-none mb-2">
+                  {formatCurrency(kpis?.today_revenue ?? 0).whole}
+                  <span className="text-xl font-normal opacity-70">
+                    {formatCurrency(kpis?.today_revenue ?? 0).decimal}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="flex items-center text-xs font-semibold bg-white/20 text-white rounded-full px-2 py-0.5">
+                    {(kpis?.revenue_change ?? 0) >= 0 ? (
+                      <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3 mr-0.5" />
+                    )}
+                    {(kpis?.revenue_change ?? 0) >= 0 ? "+" : ""}
+                    {kpis?.revenue_change ?? 0}%
+                  </span>
+                  <span className="text-xs text-white/60">vs. yesterday</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
+        {/* Orders Today */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -244,21 +423,41 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-1">
-            <div className="text-4xl font-bold tracking-tight leading-none mb-2">
-              142
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +5.2%
-              </span>
-              <span className="text-xs text-muted-foreground">
-                vs. 135 yesterday
-              </span>
-            </div>
+            {loading ? (
+              <>
+                <Skeleton className="h-10 w-20 mb-2" />
+                <Skeleton className="h-5 w-32" />
+              </>
+            ) : (
+              <>
+                <div className="text-4xl font-bold tracking-tight leading-none mb-2">
+                  {kpis?.today_orders ?? 0}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`flex items-center text-xs font-semibold rounded-full px-2 py-0.5 ${(kpis?.orders_change ?? 0) >= 0
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-600"
+                      }`}
+                  >
+                    {(kpis?.orders_change ?? 0) >= 0 ? (
+                      <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3 mr-0.5" />
+                    )}
+                    {(kpis?.orders_change ?? 0) >= 0 ? "+" : ""}
+                    {kpis?.orders_change ?? 0}%
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    vs. {kpis?.yesterday_orders ?? 0} yesterday
+                  </span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
+        {/* Avg. Order Value */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -269,24 +468,49 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-1">
-            <div className="text-4xl font-bold tracking-tight leading-none mb-2">
-              340
-              <span className="text-xl font-normal text-muted-foreground">
-                .00
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center text-xs font-semibold bg-red-100 text-red-600 rounded-full px-2 py-0.5">
-                <ArrowDownRight className="h-3 w-3 mr-0.5" />
-                -2.1%
-              </span>
-              <span className="text-xs text-muted-foreground">
-                vs. ₱347 yesterday
-              </span>
-            </div>
+            {loading ? (
+              <>
+                <Skeleton className="h-10 w-28 mb-2" />
+                <Skeleton className="h-5 w-36" />
+              </>
+            ) : (
+              <>
+                <div className="text-4xl font-bold tracking-tight leading-none mb-2">
+                  {formatCurrency(kpis?.today_avg_order ?? 0).whole}
+                  <span className="text-xl font-normal text-muted-foreground">
+                    {formatCurrency(kpis?.today_avg_order ?? 0).decimal}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`flex items-center text-xs font-semibold rounded-full px-2 py-0.5 ${(kpis?.aov_change ?? 0) >= 0
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-600"
+                      }`}
+                  >
+                    {(kpis?.aov_change ?? 0) >= 0 ? (
+                      <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3 mr-0.5" />
+                    )}
+                    {(kpis?.aov_change ?? 0) >= 0 ? "+" : ""}
+                    {kpis?.aov_change ?? 0}%
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    vs. ₱
+                    {(kpis?.yesterday_avg_order ?? 0).toLocaleString("en-PH", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}{" "}
+                    yesterday
+                  </span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
+        {/* Stock Alerts */}
         <Card className="shadow-sm border-amber-200 bg-amber-50/60 dark:bg-amber-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-xs font-medium text-amber-700 dark:text-amber-400">
@@ -297,19 +521,25 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-1">
-            <div className="text-4xl font-bold tracking-tight leading-none text-amber-800 dark:text-amber-300 mb-2">
-              3
-            </div>
-            <button
-              className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 underline underline-offset-2 bg-transparent border-none p-0 cursor-pointer"
-              onClick={() =>
-                document
-                  .getElementById("low-stock")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              View affected items →
-            </button>
+            {loading ? (
+              <>
+                <Skeleton className="h-10 w-12 mb-2 bg-amber-200/50" />
+                <Skeleton className="h-4 w-28 bg-amber-200/50" />
+              </>
+            ) : (
+              <>
+                <div className="text-4xl font-bold tracking-tight leading-none text-amber-800 dark:text-amber-300 mb-2">
+                  {stockAlertCount}
+                </div>
+                <Link
+                  href="/inventory"
+                  onClick={(e) => handleRestrictedLinkClick(e, "/inventory")}
+                  className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 underline underline-offset-2 bg-transparent border-none p-0 cursor-pointer"
+                >
+                  View affected items →
+                </Link>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -327,15 +557,44 @@ export default function Dashboard() {
                 This week · PHP
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Peak day</p>
-              <p className="text-sm font-semibold text-foreground">
-                Saturday · ₱14,200
-              </p>
-            </div>
+            {!loading && peakDay && Number(peakDay.total_revenue) > 0 && (
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Peak day</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {peakDay.day_label} · ₱
+                  {Number(peakDay.total_revenue).toLocaleString("en-PH", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                </p>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="flex-1 min-h-[280px]">
-            <Line data={chartData} options={chartOptions as any} />
+            {loading ? (
+              <div className="flex flex-col justify-end h-full gap-2 pb-6">
+                <div className="flex items-end gap-3 h-full">
+                  {[40, 55, 70, 60, 80, 90, 75].map((h, i) => (
+                    <Skeleton
+                      key={i}
+                      className="flex-1 rounded-t-sm"
+                      style={{ height: `${h}%` }}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <Skeleton key={i} className="flex-1 h-3" />
+                  ))}
+                </div>
+              </div>
+            ) : revenueTrend.length > 0 ? (
+              <Line data={chartData} options={chartOptions as any} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                No revenue data for this week yet.
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -349,40 +608,64 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-semibold text-xs ${activity.color}`}
-                    >
-                      {activity.initials}
+              {loading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
+                        <Skeleton className="h-3 w-1/4" />
+                      </div>
                     </div>
-                    <div className="space-y-0.5 min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-snug">
-                        {activity.user}{" "}
-                        <span className="font-normal text-muted-foreground">
-                          {activity.action}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {activity.detail}
-                      </p>
-                      <p className="text-xs text-muted-foreground/50">
-                        {activity.time}
-                      </p>
-                    </div>
-                    {activity.count > 1 && (
-                      <span className="shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded-md bg-[#fbe4ea] text-[#C2456A]">
-                        ×{activity.count}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : recentActivity.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivity.map((entry) => {
+                    const colorClass =
+                      categoryColors[entry.category] || categoryColors.System;
+                    return (
+                      <div key={entry.id} className="flex items-start gap-3">
+                        <div
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-semibold text-xs ${colorClass}`}
+                        >
+                          {getInitials(entry.user_name)}
+                        </div>
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <p className="text-sm font-medium leading-snug">
+                            {entry.user_name}{" "}
+                            <span className="font-normal text-muted-foreground">
+                              {entry.action}
+                            </span>
+                          </p>
+                          {entry.target_name && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {entry.target_type
+                                ? `${entry.target_type}: `
+                                : ""}
+                              {entry.target_name}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground/50">
+                            {timeAgo(entry.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No recent activity yet.
+                </p>
+              )}
               <div className="mt-5 pt-4 border-t border-border">
                 <Button
                   variant="link"
                   className="text-sm text-primary hover:text-primary/80 p-0 h-auto w-full justify-center"
+                  render={<Link href="/audit" onClick={(e) => handleRestrictedLinkClick(e, "/audit")} />}
                 >
                   View all activity
                 </Button>
@@ -400,44 +683,61 @@ export default function Dashboard() {
               <Button
                 variant="link"
                 className="text-xs text-primary p-0 h-auto"
+                render={<Link href="/inventory" onClick={(e) => handleRestrictedLinkClick(e, "/inventory")} />}
               >
                 Manage →
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {lowStockItems.map((item) => {
-                  const severity = stockSeverity(item.stock, item.threshold);
-                  const pct = Math.round((item.stock / item.threshold) * 100);
-
-                  return (
-                    <div key={item.id}>
+              {loading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i}>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium">{item.name}</p>
-                        <span className="text-sm font-bold tabular-nums">
-                          {item.stock}
-                          <span className="text-xs font-normal text-muted-foreground">
-                            /{item.threshold}
-                          </span>
-                        </span>
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-12" />
                       </div>
-                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${severityBar[severity]}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                      <Skeleton className="h-2 w-full rounded-full" />
                     </div>
-                  );
-                })}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full mt-5 text-xs border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-900 font-medium"
-              >
-                Reorder all low-stock items
-              </Button>
+                  ))}
+                </div>
+              ) : lowStockItems.length > 0 ? (
+                <div className="space-y-4">
+                  {lowStockItems.map((item) => {
+                    const severity = stockSeverity(
+                      item.current_stock,
+                      item.low_stock_threshold,
+                    );
+                    const pct = Math.round(
+                      (item.current_stock / item.low_stock_threshold) * 100,
+                    );
+
+                    return (
+                      <div key={item.item_id}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium">{item.item_name}</p>
+                          <span className="text-sm font-bold tabular-nums">
+                            {item.current_stock}
+                            <span className="text-xs font-normal text-muted-foreground">
+                              /{item.low_stock_threshold} {item.unit}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${severityBar[severity]}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  All items are well-stocked! 🎉
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
