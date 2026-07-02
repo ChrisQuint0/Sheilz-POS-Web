@@ -118,6 +118,17 @@ export async function GET(request: Request) {
         filenameStr += `_${format(new Date(), "yyyyMMdd")}`;
     }
     
+    // Log the export event
+    const { logAppEvent } = await import('@/app/audit/actions');
+    await logAppEvent('Report Exported', 'Low', 'Report', `${filenameStr}.xlsx`, {
+      metadata: {
+        preset,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        rowsExported: rowsToExport.length,
+      }
+    });
+
     return new NextResponse(buf, {
       status: 200,
       headers: {

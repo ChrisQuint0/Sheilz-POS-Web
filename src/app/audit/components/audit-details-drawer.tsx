@@ -39,7 +39,7 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-6">
-          
+
           {/* Event Information */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Event Information</h3>
@@ -58,7 +58,7 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Timestamp</span>
-                <span className="font-medium">{format(new Date(log.timestamp), "MMM dd, yyyy • hh:mm a")}</span>
+                <span className="font-medium">{format(new Date(log.created_at), "MMM dd, yyyy • hh:mm a")}</span>
               </div>
             </div>
           </div>
@@ -69,43 +69,43 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
             <div className="p-4 border rounded-lg bg-card shadow-sm space-y-3 text-sm">
               <div className="flex justify-between items-center border-b pb-2">
                 <span className="text-muted-foreground">User Name</span>
-                <span className="font-medium">{log.user.name}</span>
+                <span className="font-medium">{log.user_name}</span>
               </div>
               <div className="flex justify-between items-center border-b pb-2">
                 <span className="text-muted-foreground">Role</span>
-                <span className="font-medium">{log.user.role}</span>
+                <span className="font-medium">{log.user_role}</span>
               </div>
               <div className="flex justify-between items-center border-b pb-2">
                 <span className="text-muted-foreground">Email</span>
-                <span className="font-medium">{log.user.email}</span>
+                <span className="font-medium">{log.user_email}</span>
               </div>
               <div className="flex justify-between items-center border-b pb-2">
                 <span className="text-muted-foreground">IP Address</span>
-                <span className="font-mono text-xs">{log.ipAddress}</span>
+                <span className="font-mono text-xs">{log.ip_address ?? "-"}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Device</span>
-                <span className="font-medium">{log.device}</span>
+                <span className="font-medium">{log.device ?? "-"}</span>
               </div>
             </div>
           </div>
 
           {/* Target Information */}
-          {log.target && (
+          {log.target_type && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Target Information</h3>
               <div className="p-4 border rounded-lg bg-card shadow-sm space-y-3 text-sm">
                 <div className="flex justify-between items-center border-b pb-2">
                   <span className="text-muted-foreground">Affected Record</span>
-                  <span className="font-medium">{log.target.name}</span>
+                  <span className="font-medium">{log.target_name ?? "-"}</span>
                 </div>
                 <div className="flex justify-between items-center border-b pb-2">
                   <span className="text-muted-foreground">Record Type</span>
-                  <span className="font-medium">{log.target.type}</span>
+                  <span className="font-medium">{log.target_type}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Record ID</span>
-                  <span className="font-mono text-xs">{log.target.id}</span>
+                  <span className="font-mono text-xs">{log.target_id ?? "-"}</span>
                 </div>
               </div>
             </div>
@@ -116,7 +116,7 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Change History</h3>
               <div className="p-4 border rounded-lg bg-card shadow-sm space-y-4 text-sm">
-                {log.details.previousValue && (
+                {log.details?.previousValue && (
                   <div className="space-y-1">
                     <span className="text-muted-foreground text-xs uppercase tracking-wider">Previous Value</span>
                     <div className="bg-destructive/10 text-destructive p-2 rounded-md font-mono text-xs overflow-x-auto whitespace-pre-wrap">
@@ -124,7 +124,7 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
                     </div>
                   </div>
                 )}
-                {log.details.newValue && (
+                {log.details?.newValue && (
                   <div className="space-y-1">
                     <span className="text-muted-foreground text-xs uppercase tracking-wider">New Value</span>
                     <div className="bg-primary/10 text-primary p-2 rounded-md font-mono text-xs overflow-x-auto whitespace-pre-wrap">

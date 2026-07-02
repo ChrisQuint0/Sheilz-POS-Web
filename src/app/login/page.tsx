@@ -29,12 +29,23 @@ export default function LoginPage() {
     });
 
     if (signInError) {
+      // Import dynamically to keep this mostly client side or just import at top. Let's use standard import.
+      // We will add the import at the top in a separate chunk, but for now we can just require it or use server action
+      import('@/app/audit/actions').then(({ logAppEvent }) => {
+        logAppEvent('Failed Login', 'Medium', 'User', email, { metadata: { error: signInError.message } });
+      });
+
       setError(signInError.message);
       setIsLoading(false);
       return;
     }
 
-    // Success — push to dashboard and refresh to let middleware pick up cookies
+    // Success — log it
+    await import('@/app/audit/actions').then(({ logAppEvent }) => {
+      return logAppEvent('User Login', 'Low', 'User', email);
+    });
+
+    // Push to dashboard and refresh to let middleware pick up cookies
     router.push('/dashboard');
     router.refresh();
   };

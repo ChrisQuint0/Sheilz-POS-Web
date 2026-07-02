@@ -29,8 +29,8 @@ export function AuditMobileList({ logs, onCardClick }: AuditMobileListProps) {
   return (
     <div className="flex flex-col gap-4 p-4 pb-20">
       {logs.map((log) => (
-        <Card 
-          key={log.id} 
+        <Card
+          key={log.id}
           className="cursor-pointer hover:border-ring transition-colors"
           onClick={() => onCardClick(log)}
         >
@@ -39,22 +39,22 @@ export function AuditMobileList({ logs, onCardClick }: AuditMobileListProps) {
               <div className="font-semibold text-lg">{log.action}</div>
               <SeverityBadge value={log.severity} />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="flex flex-col">
                 <span className="text-muted-foreground text-xs">By</span>
-                <span className="font-medium">{log.user.name}</span>
+                <span className="font-medium">{log.user_name}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-muted-foreground text-xs">Date</span>
-                <span className="font-medium">{format(new Date(log.timestamp), "MMM dd, yyyy • hh:mm a")}</span>
+                <span className="font-medium">{format(new Date(log.created_at), "MMM dd, yyyy • hh:mm a")}</span>
               </div>
               <div className="flex flex-col col-span-2">
                 <span className="text-muted-foreground text-xs">Category</span>
                 <span className="font-medium">{log.category}</span>
               </div>
             </div>
-            
+
             <div className="mt-2 pt-3 border-t border-border/50 text-center text-xs text-primary font-medium uppercase tracking-wider">
               Tap to View Details
             </div>

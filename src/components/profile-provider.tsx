@@ -90,6 +90,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, fetchProfile, supabase.auth]);
 
   const signOut = async () => {
+    // Log the event before signing out while we still have the user session
+    await import('@/app/audit/actions').then(({ logAppEvent }) => {
+      return logAppEvent('User Logout', 'Low', 'User', profile?.email ?? null);
+    }).catch(console.error);
+
     await supabase.auth.signOut();
     setProfile(null);
     router.push('/login');

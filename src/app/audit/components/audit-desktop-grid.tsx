@@ -41,16 +41,15 @@ const CategoryBadge = (props: { value: string }) => {
 export function AuditDesktopGrid({ logs, onRowClick }: AuditDesktopGridProps) {
   const columnDefs = useMemo<ColDef<AuditLog>[]>(() => [
     {
-      field: "timestamp",
+      field: "created_at",
       headerName: "Timestamp",
       valueFormatter: (params) => format(new Date(params.value), "MMM dd, yyyy • hh:mm a"),
       minWidth: 180,
       flex: 1
     },
     {
-      field: "user",
+      field: "user_name",
       headerName: "User",
-      valueGetter: (params) => params.data?.user?.name,
       minWidth: 150,
       flex: 1
     },
@@ -68,11 +67,10 @@ export function AuditDesktopGrid({ logs, onRowClick }: AuditDesktopGridProps) {
       flex: 1.5
     },
     {
-      field: "target",
       headerName: "Target",
       valueGetter: (params) => {
-        if (!params.data?.target) return "-"
-        return `${params.data.target.type}: ${params.data.target.name}`
+        if (!params.data?.target_name) return "-"
+        return `${params.data.target_type}: ${params.data.target_name}`
       },
       minWidth: 180,
       flex: 1.5
@@ -85,14 +83,16 @@ export function AuditDesktopGrid({ logs, onRowClick }: AuditDesktopGridProps) {
       flex: 0.8
     },
     {
-      field: "ipAddress",
+      field: "ip_address",
       headerName: "IP Address",
+      valueFormatter: (params) => params.value ?? "-",
       minWidth: 130,
       flex: 1
     },
     {
       field: "device",
       headerName: "Device",
+      valueFormatter: (params) => params.value ?? "-",
       minWidth: 150,
       flex: 1
     }
