@@ -15,15 +15,23 @@ import { exportToExcel, exportChartsToPDF } from "./utils/export-utils";
 function AnalyticsDashboard() {
   const { data, refresh } = useAnalytics();
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     exportToExcel(data);
+    const { logAppEvent } = await import('@/app/audit/actions');
+    logAppEvent("Report Exported", "Low", "Report", "Sheilz_Analytics_Report.xlsx", null).catch(console.error);
+  };
+
+  const handleExportCharts = async () => {
+    await exportChartsToPDF();
+    const { logAppEvent } = await import('@/app/audit/actions');
+    logAppEvent("Report Exported", "Low", "Report", "Sheilz_Analytics_Charts.pdf", null).catch(console.error);
   };
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto">
       <AnalyticsFilters 
         onExportExcel={handleExportExcel}
-        onExportCharts={exportChartsToPDF}
+        onExportCharts={handleExportCharts}
         onRefresh={refresh}
       />
       

@@ -115,23 +115,53 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
           {(log.details?.previousValue || log.details?.newValue) && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Change History</h3>
-              <div className="p-4 border rounded-lg bg-card shadow-sm space-y-4 text-sm">
-                {log.details?.previousValue && (
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wider">Previous Value</span>
-                    <div className="bg-destructive/10 text-destructive p-2 rounded-md font-mono text-xs overflow-x-auto whitespace-pre-wrap">
-                      {typeof log.details.previousValue === 'object' ? JSON.stringify(log.details.previousValue, null, 2) : log.details.previousValue}
-                    </div>
-                  </div>
-                )}
-                {log.details?.newValue && (
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wider">New Value</span>
-                    <div className="bg-primary/10 text-primary p-2 rounded-md font-mono text-xs overflow-x-auto whitespace-pre-wrap">
-                      {typeof log.details.newValue === 'object' ? JSON.stringify(log.details.newValue, null, 2) : log.details.newValue}
-                    </div>
-                  </div>
-                )}
+              <div className="border rounded-lg bg-card shadow-sm overflow-hidden text-sm">
+                <table className="w-full text-left">
+                  <thead className="bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 font-medium border-b text-xs uppercase tracking-wider w-1/3">Field</th>
+                      <th className="px-4 py-2 font-medium border-b text-xs uppercase tracking-wider w-1/3">Previous Value</th>
+                      <th className="px-4 py-2 font-medium border-b text-xs uppercase tracking-wider w-1/3">New Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {Array.from(
+                      new Set([
+                        ...(log.details.previousValue ? Object.keys(log.details.previousValue) : []),
+                        ...(log.details.newValue ? Object.keys(log.details.newValue) : []),
+                      ])
+                    ).map((key) => {
+                      const prevVal = log.details?.previousValue?.[key];
+                      const newVal = log.details?.newValue?.[key];
+                      const isChanged = prevVal !== newVal;
+                      return (
+                        <tr key={key} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2.5 font-medium capitalize text-muted-foreground align-top">
+                            {key.replace(/_/g, ' ')}
+                          </td>
+                          <td className="px-4 py-2.5 align-top">
+                            {prevVal !== undefined && prevVal !== null ? (
+                              <span className={isChanged ? "bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-mono text-xs break-all" : ""}>
+                                {String(prevVal)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/40 italic text-xs">None</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 align-top">
+                            {newVal !== undefined && newVal !== null ? (
+                              <span className={isChanged ? "bg-primary/10 text-[#C2456A] px-1.5 py-0.5 rounded font-mono text-xs break-all" : ""}>
+                                {String(newVal)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/40 italic text-xs">None</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

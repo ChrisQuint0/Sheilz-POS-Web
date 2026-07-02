@@ -18,13 +18,13 @@ export type AuditAction =
   | "Transaction Created" | "Transaction Edited" | "Transaction Deleted"
   | "Transaction Voided (Not Made)" | "Transaction Voided (Consumed)"
   // Inventory
-  | "Ingredient Created" | "Inventory Replenished" | "Inventory Adjusted"
+  | "Ingredient Created" | "Ingredient Updated" | "Ingredient Deleted" | "Inventory Replenished" | "Inventory Adjusted"
   | "Waste Recorded" | "Stock Correction"
   // Team Management
   | "User Created" | "User Updated" | "Role Changed"
-  | "User Deactivated" | "User Deleted"
+  | "User Deactivated" | "User Reactivated" | "User Deleted"
   // Products
-  | "Product Created" | "Product Updated" | "Product Archived" | "Product Deleted"
+  | "Product Created" | "Product Updated" | "Product Archived" | "Product Restored" | "Product Deleted"
   // System
   | "Settings Updated" | "Backup Created"
   // Analytics
@@ -79,11 +79,11 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   "User Login", "User Logout", "Failed Login", "Password Reset",
   "Transaction Created", "Transaction Edited", "Transaction Deleted",
   "Transaction Voided (Not Made)", "Transaction Voided (Consumed)",
-  "Ingredient Created", "Inventory Replenished", "Inventory Adjusted",
+  "Ingredient Created", "Ingredient Updated", "Ingredient Deleted", "Inventory Replenished", "Inventory Adjusted",
   "Waste Recorded", "Stock Correction",
   "User Created", "User Updated", "Role Changed",
-  "User Deactivated", "User Deleted",
-  "Product Created", "Product Updated", "Product Archived", "Product Deleted",
+  "User Deactivated", "User Reactivated", "User Deleted",
+  "Product Created", "Product Updated", "Product Archived", "Product Restored", "Product Deleted",
   "Settings Updated", "Backup Created",
   "Report Exported"
 ]
