@@ -111,7 +111,7 @@ export async function createUser(input: {
 
   // 2. Update the auto-created profile with the chosen role & display name
   //    (the trigger only sets a basic display_name from metadata)
-  const { error: updateError } = await supabaseAdmin
+  const { error: updateError } = await auth.supabase
     .from('profiles')
     .update({
       display_name: input.displayName,
@@ -123,6 +123,25 @@ export async function createUser(input: {
   if (updateError) {
     return { success: false, error: updateError.message };
   }
+
+  // 3. Manually log the "User Created" event since the trigger skips INSERT
+  await auth.supabase.rpc('insert_audit_log', {
+    p_user_id: auth.userId,
+    p_category: 'Team Management',
+    p_action: 'User Created',
+    p_severity: 'Medium',
+    p_target_type: 'User',
+    p_target_id: newUser.user.id,
+    p_target_name: input.displayName,
+    p_details: {
+      newValue: {
+        display_name: input.displayName,
+        email: input.email,
+        role: input.role,
+        status: 'Active'
+      }
+    }
+  });
 
   revalidatePath('/team');
   return { success: true };
@@ -212,12 +231,22 @@ export async function deleteUser(targetUserId: string): Promise<ActionResult> {
     };
   }
 
-  // Delete from auth (cascades to profiles via FK)
+  // Delete from profiles first using auth.supabase to trigger audit log with correct actor
+  const { error: profileDeleteError } = await auth.supabase
+    .from('profiles')
+    .delete()
+    .eq('id', targetUserId);
+
+  if (profileDeleteError) {
+    return { success: false, error: profileDeleteError.message };
+  }
+
+  // Delete from auth to fully clean up
   const supabaseAdmin = createAdminClient();
   const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
 
   if (deleteError) {
-    return { success: false, error: deleteError.message };
+    console.error('Failed to clean up auth user:', deleteError.message);
   }
 
   revalidatePath('/team');

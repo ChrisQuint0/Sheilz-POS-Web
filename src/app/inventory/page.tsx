@@ -260,6 +260,7 @@ export default function InventoryPage() {
             quantity_changed: newStock - selectedItem.currentStock,
             new_stock: newStock,
             user_id: profile?.id ?? null,
+            notes: ingredientData.notes ?? null,
           })
           .select()
           .single();
