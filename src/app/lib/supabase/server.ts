@@ -1,8 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 export async function createClient() {
   const cookieStore = await cookies();
+  const reqHeaders = await headers();
+  
+  const forwardedFor = reqHeaders.get('x-forwarded-for');
+  const realIp = reqHeaders.get('x-real-ip');
+  const ip = forwardedFor || realIp || '';
+  const userAgent = reqHeaders.get('user-agent') || '';
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +28,12 @@ export async function createClient() {
             // This can be ignored if you have middleware refreshing
             // user sessions.
           }
+        },
+      },
+      global: {
+        headers: {
+          'x-forwarded-for': ip,
+          'user-agent': userAgent,
         },
       },
     }

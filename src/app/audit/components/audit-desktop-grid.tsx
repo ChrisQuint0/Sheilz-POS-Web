@@ -9,6 +9,8 @@ ModuleRegistry.registerModules([AllCommunityModule])
 import { format } from "date-fns"
 import { AuditLog } from "../data"
 import { Badge } from "@/components/ui/badge"
+import { UAParser } from "ua-parser-js"
+import { formatIpAddress, formatDevice } from "../utils"
 
 // AG Grid styles
 import "ag-grid-community/styles/ag-grid.css"
@@ -85,14 +87,14 @@ export function AuditDesktopGrid({ logs, onRowClick }: AuditDesktopGridProps) {
     {
       field: "ip_address",
       headerName: "IP Address",
-      valueFormatter: (params) => params.value ?? "-",
+      valueFormatter: (params) => formatIpAddress(params.value),
       minWidth: 130,
       flex: 1
     },
     {
       field: "device",
       headerName: "Device",
-      valueFormatter: (params) => params.value ?? "-",
+      valueFormatter: (params) => formatDevice(params.value),
       minWidth: 150,
       flex: 1
     }

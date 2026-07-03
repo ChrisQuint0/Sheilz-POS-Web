@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Separator } from "@/components/ui/separator"
+import { formatIpAddress, formatDevice } from "../utils"
 
 interface AuditDetailsDrawerProps {
   open: boolean
@@ -81,11 +82,11 @@ export function AuditDetailsDrawer({ open, onOpenChange, log }: AuditDetailsDraw
               </div>
               <div className="flex justify-between items-center border-b pb-2">
                 <span className="text-muted-foreground">IP Address</span>
-                <span className="font-mono text-xs">{log.ip_address ?? "-"}</span>
+                <span className="font-mono text-xs">{formatIpAddress(log.ip_address)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Device</span>
-                <span className="font-medium">{log.device ?? "-"}</span>
+                <span className="font-medium" title={log.device || undefined}>{formatDevice(log.device)}</span>
               </div>
             </div>
           </div>
