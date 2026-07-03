@@ -10,6 +10,18 @@ export async function createClient() {
   const ip = forwardedFor || realIp || '';
   const userAgent = reqHeaders.get('user-agent') || '';
 
+  const headersObj: Record<string, string> = {
+    'user-agent': userAgent,
+  };
+
+  // Only forward the IP if it's a real public IP. 
+  // If we are on localhost (::1 or 127.0.0.1), we omit it. 
+  // This forces the Supabase gateway to pick up the actual public IP 
+  // of the machine making the outbound request.
+  if (ip && ip !== '::1' && ip !== '127.0.0.1') {
+    headersObj['x-forwarded-for'] = ip;
+  }
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,10 +43,7 @@ export async function createClient() {
         },
       },
       global: {
-        headers: {
-          'x-forwarded-for': ip,
-          'user-agent': userAgent,
-        },
+        headers: headersObj,
       },
     }
   );
