@@ -163,10 +163,15 @@ export default function POSSettingsPage() {
             const prices: Record<string, number> = {};
 
             productVariants.forEach((variant: any) => {
-              // Build combo key
-              const sizeKey = variant.size_id || "null";
-              const tempKey = variant.temperature_id || "null";
-              const comboKey = `${sizeKey}_${tempKey}`;
+              // Build combo key. When both size_id and temperature_id are null
+              // (e.g. Pastry products with no variants), use "default" so it
+              // matches the key produced by ProductModal.variantCombinations.
+              const hasSize = !!variant.size_id;
+              const hasTemp = !!variant.temperature_id;
+              const comboKey =
+                !hasSize && !hasTemp
+                  ? "default"
+                  : `${variant.size_id || "null"}_${variant.temperature_id || "null"}`;
 
               // Track unique sizes and temperatures
               if (variant.size_id && !productSizes.includes(variant.size_id)) {
@@ -190,9 +195,12 @@ export default function POSSettingsPage() {
             > = {};
 
             productVariants.forEach((variant: any) => {
-              const sizeKey = variant.size_id || "null";
-              const tempKey = variant.temperature_id || "null";
-              const comboKey = `${sizeKey}_${tempKey}`;
+              const hasSize = !!variant.size_id;
+              const hasTemp = !!variant.temperature_id;
+              const comboKey =
+                !hasSize && !hasTemp
+                  ? "default"
+                  : `${variant.size_id || "null"}_${variant.temperature_id || "null"}`;
 
               // Find recipes for this variant
               const variantRecipes = recipes.filter(
@@ -381,11 +389,16 @@ export default function POSSettingsPage() {
     }
     // If neither sizes nor temperatures are selected, create a single default variant
     else {
+      // The modal writes the price for the "default" combo under this key
+      // (see ProductModal.variantCombinations when no sizes/temps are picked).
+      // Use the explicit key rather than Object.values()[0], which is order-
+      // dependent and silently returns 0 if the user opens an existing product
+      // and saves without re-typing the price.
       variantRows.push({
         product_id: productId,
         size_id: null,
         temperature_id: null,
-        price: Object.values(prices)[0] ?? 0,
+        price: prices["default"] ?? 0,
       });
     }
 
@@ -587,9 +600,14 @@ export default function POSSettingsPage() {
       > = {};
 
       variants.forEach((variant: any) => {
-        const sizeKey = variant.size_id || "null";
-        const tempKey = variant.temperature_id || "null";
-        const comboKey = `${sizeKey}_${tempKey}`;
+        // Use "default" when both size_id and temperature_id are null so the
+        // key matches ProductModal.variantCombinations.
+        const hasSize = !!variant.size_id;
+        const hasTemp = !!variant.temperature_id;
+        const comboKey =
+          !hasSize && !hasTemp
+            ? "default"
+            : `${variant.size_id || "null"}_${variant.temperature_id || "null"}`;
 
         if (variant.size_id && !productSizes.includes(variant.size_id)) {
           productSizes.push(variant.size_id);
