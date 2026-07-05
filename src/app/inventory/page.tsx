@@ -9,6 +9,7 @@ import {
   getInventoryStatus,
 } from "./data";
 import { createClient } from "@/app/lib/supabase/client";
+import { deleteImage } from "@/app/lib/supabase/storage";
 import { InventoryCard } from "./components/inventory-card";
 import { IngredientModal } from "./components/ingredient-modal";
 import { ReplenishModal } from "./components/replenish-modal";
@@ -210,6 +211,21 @@ export default function InventoryPage() {
     if (selectedItem) {
       // Edit
       const supabase = createClient();
+      
+      // If image URL changed, delete the old one
+      if (
+        selectedItem.imageUrl &&
+        ingredientData.imageUrl &&
+        selectedItem.imageUrl !== ingredientData.imageUrl
+      ) {
+        try {
+          await deleteImage(selectedItem.imageUrl);
+        } catch (error) {
+          console.error("Failed to delete old image:", error);
+          // Continue with update anyway
+        }
+      }
+      
       const { data, error } = await supabase
         .from("inventory_items")
         .update({
@@ -326,6 +342,14 @@ export default function InventoryPage() {
 
   const handleDeleteIngredient = async (id: string) => {
     const supabase = createClient();
+    
+    // Get the item to retrieve its image URL before deleting
+    const { data: item } = await supabase
+      .from("inventory_items")
+      .select("image_url")
+      .eq("id", id)
+      .single();
+    
     const { error } = await supabase
       .from("inventory_items")
       .delete()
@@ -338,6 +362,16 @@ export default function InventoryPage() {
           "This ingredient is used in one or more product recipes. Remove it from all recipes before deleting.",
       });
       return;
+    }
+    
+    // Delete the image from storage if it exists
+    if (item?.image_url) {
+      try {
+        await deleteImage(item.image_url);
+      } catch (error) {
+        console.error("Failed to delete ingredient image:", error);
+        // Continue anyway - the ingredient is already deleted
+      }
     }
 
     setItems((prev) => prev.filter((i) => i.id !== id));

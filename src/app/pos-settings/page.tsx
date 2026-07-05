@@ -34,6 +34,7 @@ import { MoreSettingsModal } from "./components/MoreSettingsModal";
 import { ArchivedProductsModal } from "./components/ArchivedProductsModal";
 import { Product, Category, Ingredient } from "./types";
 import { createClient } from "@/app/lib/supabase/client";
+import { deleteImage } from "@/app/lib/supabase/storage";
 import { toast } from "sonner";
 import {
   initialPaymentMethods,
@@ -279,6 +280,27 @@ export default function POSSettingsPage() {
     let productId: string;
 
     if (isEdit) {
+      // Get the old product to check if image changed
+      const { data: oldProduct } = await supabase
+        .from("products")
+        .select("image_url")
+        .eq("id", savedProduct.id)
+        .single();
+      
+      // If image URL changed, delete the old one
+      if (
+        oldProduct?.image_url &&
+        savedProduct.image &&
+        oldProduct.image_url !== savedProduct.image
+      ) {
+        try {
+          await deleteImage(oldProduct.image_url);
+        } catch (error) {
+          console.error("Failed to delete old product image:", error);
+          // Continue with update anyway
+        }
+      }
+      
       const { error } = await supabase
         .from("products")
         .update({
@@ -530,6 +552,14 @@ export default function POSSettingsPage() {
 
   const handleArchiveProduct = async (productId: string) => {
     const supabase = createClient();
+    
+    // Get the product to retrieve its image URL before archiving
+    const { data: product } = await supabase
+      .from("products")
+      .select("image_url")
+      .eq("id", productId)
+      .single();
+    
     const { error } = await supabase
       .from("products")
       .update({ archived_at: new Date().toISOString() })
@@ -538,6 +568,16 @@ export default function POSSettingsPage() {
     if (error) {
       alert("Failed to archive product: " + error.message);
       return;
+    }
+    
+    // Delete the image from storage if it exists
+    if (product?.image_url) {
+      try {
+        await deleteImage(product.image_url);
+      } catch (error) {
+        console.error("Failed to delete product image:", error);
+        // Continue anyway - the product is already archived
+      }
     }
 
     setProducts((prev) => prev.filter((p) => p.id !== productId));
