@@ -37,7 +37,10 @@ import {
   Plus,
   Check,
   Archive,
+  Loader2,
 } from "lucide-react";
+import { replaceImage } from "@/app/lib/supabase/storage";
+import { toast } from "sonner";
 
 interface ProductModalProps {
   open: boolean;
@@ -70,6 +73,7 @@ export function ProductModal({
     string | null
   >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -162,11 +166,25 @@ export function ProductModal({
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setEditedProduct((prev) => (prev ? { ...prev, image: url } : prev));
+    if (!file || !editedProduct) return;
+
+    setIsUploadingImage(true);
+    try {
+      const newImageUrl = await replaceImage(
+        editedProduct.image || null,
+        file,
+        "products",
+        editedProduct.id
+      );
+      setEditedProduct((prev) => (prev ? { ...prev, image: newImageUrl } : prev));
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Image upload error:", error);
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -415,8 +433,8 @@ export function ProductModal({
                     Product Image
                   </Label>
                   <div
-                    className="border-2 border-dashed border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 hover:border-[#C2456A]/30 transition-all cursor-pointer group relative overflow-hidden min-h-[200px]"
-                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 hover:border-[#C2456A]/30 transition-all ${!isUploadingImage ? "cursor-pointer" : "cursor-not-allowed"} group relative overflow-hidden min-h-[200px]`}
+                    onClick={() => !isUploadingImage && fileInputRef.current?.click()}
                   >
                     <input
                       type="file"
@@ -424,6 +442,7 @@ export function ProductModal({
                       className="hidden"
                       accept="image/png, image/jpeg, image/webp"
                       onChange={handleImageUpload}
+                      disabled={isUploadingImage}
                     />
                     {editedProduct.image ? (
                       <div className="absolute inset-0 w-full h-full">
@@ -433,25 +452,35 @@ export function ProductModal({
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-white text-sm font-semibold flex items-center gap-2">
-                            <ImagePlus className="w-4 h-4" /> Change Image
-                          </span>
+                          {isUploadingImage ? (
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                          ) : (
+                            <span className="text-white text-sm font-semibold flex items-center gap-2">
+                              <ImagePlus className="w-4 h-4" /> Change Image
+                            </span>
+                          )}
                         </div>
                       </div>
                     ) : (
                       <>
                         <div className="p-4 rounded-2xl bg-gray-100 text-gray-400 group-hover:text-[#C2456A] group-hover:bg-[#C2456A]/10 transition-colors">
-                          <ImagePlus className="w-8 h-8" />
+                          {isUploadingImage ? (
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                          ) : (
+                            <ImagePlus className="w-8 h-8" />
+                          )}
                         </div>
                         <div className="text-sm text-center text-gray-500">
                           <span className="text-[#C2456A] font-semibold">
-                            Click to upload
+                            {isUploadingImage ? "Uploading..." : "Click to upload"}
                           </span>{" "}
-                          or drag and drop
+                          {!isUploadingImage && "or drag and drop"}
                         </div>
-                        <div className="text-xs text-gray-400">
-                          PNG, JPG up to 5MB
-                        </div>
+                        {!isUploadingImage && (
+                          <div className="text-xs text-gray-400">
+                            PNG, JPG up to 5MB
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
