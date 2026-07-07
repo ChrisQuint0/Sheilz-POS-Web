@@ -37,7 +37,10 @@ import {
   Plus,
   Check,
   Archive,
+  Loader2,
 } from "lucide-react";
+import { createClient } from "@/app/lib/supabase/client";
+import { toast } from "sonner";
 
 interface ProductModalProps {
   open: boolean;
@@ -75,6 +78,67 @@ export function ProductModal({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [pricingErrors, setPricingErrors] = useState<string[]>([]);
+
+  // Image upload state
+  // `originalImage` is the URL the product had when the modal opened. We use
+  // it to clean up the storage bucket once a new image is committed.
+  const [originalImage, setOriginalImage] = useState<string | undefined>(
+    undefined,
+  );
+  const [imageUploading, setImageUploading] = useState(false);
+
+  // Extract the storage object path from a public Supabase URL inside the
+  // `images` bucket. Returns null if the URL doesn't reference our bucket.
+  const extractStoragePath = (
+    url: string | undefined | null,
+  ): string | null => {
+    if (!url) return null;
+    try {
+      const marker = "/storage/v1/object/public/images/";
+      const idx = url.indexOf(marker);
+      if (idx === -1) return null;
+      const path = url.substring(idx + marker.length);
+      return path.split("?")[0] || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const uploadImageToBucket = async (file: File): Promise<string> => {
+    const supabase = createClient();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const fileName = `product-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}.${ext}`;
+    const filePath = `products/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("images")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data } = supabase.storage.from("images").getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  // Best-effort delete; logs but does not throw so a missing file never blocks
+  // the save flow.
+  const deleteImageFromBucket = async (url: string | undefined) => {
+    const path = extractStoragePath(url);
+    if (!path) return;
+    const supabase = createClient();
+    const { error } = await supabase.storage.from("images").remove([path]);
+    if (error) {
+      console.warn("Failed to delete previous image:", error.message);
+    }
+  };
 
   // Get the steps based on product type
   const getSteps = (type: ProductType): string[] => {
@@ -162,12 +226,50 @@ export function ProductModal({
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setEditedProduct((prev) => (prev ? { ...prev, image: url } : prev));
+    // Reset the input so picking the same file twice still fires onChange
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image too large", {
+        description: "Please choose an image under 5MB.",
+      });
+      return;
     }
+
+    setImageUploading(true);
+    // Show a local preview while uploading so the user gets immediate feedback
+    const previewUrl = URL.createObjectURL(file);
+    setEditedProduct((prev) => (prev ? { ...prev, image: previewUrl } : prev));
+
+    try {
+      const publicUrl = await uploadImageToBucket(file);
+      // Revoke the preview blob URL now that we have a real one
+      URL.revokeObjectURL(previewUrl);
+      setEditedProduct((prev) => (prev ? { ...prev, image: publicUrl } : prev));
+    } catch (err) {
+      URL.revokeObjectURL(previewUrl);
+      // Roll back the optimistic preview
+      setEditedProduct((prev) =>
+        prev
+          ? {
+              ...prev,
+              image: prev.image === previewUrl ? undefined : prev.image,
+            }
+          : prev,
+      );
+      toast.error("Image upload failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setEditedProduct((prev) => (prev ? { ...prev, image: undefined } : prev));
   };
 
   // Recipe step: auto-select first priced combo as active tab
@@ -191,8 +293,12 @@ export function ProductModal({
     if (open) {
       setStep(0);
       setSelectedRecipeConfigId(null);
+      setImageUploading(false);
       if (product) {
         setEditedProduct({ ...product });
+        // Remember the URL the product had on open so we can delete it from
+        // the bucket if the user replaces or removes the image.
+        setOriginalImage(product.image);
       } else {
         setEditedProduct({
           id: `new-${Date.now()}`,
@@ -206,6 +312,7 @@ export function ProductModal({
           recipes: {},
           isVisible: true,
         });
+        setOriginalImage(undefined);
       }
     }
   }, [product, open]);
@@ -432,10 +539,29 @@ export function ProductModal({
                           alt="Preview"
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-white text-sm font-semibold flex items-center gap-2">
+                        {imageUploading && (
+                          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-[#3a2b27]">
+                              <Loader2 className="w-4 h-4 animate-spin text-[#C2456A]" />
+                              Uploading image...
+                            </div>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                          <span className="text-white text-sm font-semibold flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 backdrop-blur-sm">
                             <ImagePlus className="w-4 h-4" /> Change Image
                           </span>
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              handleRemoveImage();
+                            }}
+                            disabled={imageUploading}
+                            className="text-white text-sm font-semibold flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/80 hover:bg-red-600 disabled:opacity-50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" /> Remove
+                          </button>
                         </div>
                       </div>
                     ) : (
@@ -1184,13 +1310,41 @@ export function ProductModal({
                 </Button>
               ) : (
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
+                    if (imageUploading) {
+                      toast.message(
+                        "Please wait for the image to finish uploading.",
+                      );
+                      return;
+                    }
+                    // Persist the product first, then clean up the old image
+                    // only if the save succeeded. We pass the new public URL
+                    // (or undefined when removed) via `editedProduct.image`.
                     onSave(editedProduct);
                     onOpenChange(false);
+
+                    // If we replaced the image, delete the previous one from
+                    // the bucket. Skip the delete when nothing changed.
+                    if (
+                      originalImage &&
+                      originalImage !== editedProduct.image
+                    ) {
+                      void deleteImageFromBucket(originalImage);
+                    }
                   }}
                   className="bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm px-6"
+                  disabled={imageUploading}
                 >
-                  <Check className="w-4 h-4 mr-1" /> Save Product
+                  {imageUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-1" /> Save Product
+                    </>
+                  )}
                 </Button>
               )}
             </div>
