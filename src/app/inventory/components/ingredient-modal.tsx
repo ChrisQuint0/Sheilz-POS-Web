@@ -27,7 +27,10 @@ import {
   Package,
   Check,
   X,
+  Loader2,
 } from "lucide-react";
+import { replaceImage } from "@/app/lib/supabase/storage";
+import { toast } from "sonner";
 
 interface IngredientModalProps {
   open: boolean;
@@ -51,12 +54,28 @@ export function IngredientModal({
   const isEdit = !!item;
   const [step, setStep] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      handleChange("imageUrl", url);
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    try {
+      const itemId = item?.id || `new-${Date.now()}`;
+      const newImageUrl = await replaceImage(
+        formData.imageUrl || null,
+        file,
+        "inventory",
+        itemId
+      );
+      handleChange("imageUrl", newImageUrl);
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Image upload error:", error);
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -201,7 +220,7 @@ export function IngredientModal({
                 />
                 <div
                   className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/60 flex flex-col items-center justify-center cursor-pointer hover:border-[#C2456A]/40 hover:bg-[#C2456A]/5 transition-all group"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => !isUploadingImage && fileInputRef.current?.click()}
                 >
                   {formData.imageUrl ? (
                     <div className="relative w-full h-full">
@@ -211,16 +230,24 @@ export function IngredientModal({
                         className="w-full h-full object-contain rounded-lg"
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                        <span className="text-white text-xs font-semibold">
-                          Change Image
-                        </span>
+                        {isUploadingImage ? (
+                          <Loader2 className="w-5 h-5 text-white animate-spin" />
+                        ) : (
+                          <span className="text-white text-xs font-semibold">
+                            Change Image
+                          </span>
+                        )}
                       </div>
                     </div>
                   ) : (
                     <>
-                      <Upload className="w-5 h-5 text-gray-300 mb-1.5 group-hover:text-[#C2456A] transition-colors" />
+                      {isUploadingImage ? (
+                        <Loader2 className="w-5 h-5 text-[#C2456A] mb-1.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-5 h-5 text-gray-300 mb-1.5 group-hover:text-[#C2456A] transition-colors" />
+                      )}
                       <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-[#C2456A] transition-colors">
-                        Click to Upload
+                        {isUploadingImage ? "Uploading..." : "Click to Upload"}
                       </span>
                     </>
                   )}
