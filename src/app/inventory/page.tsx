@@ -1,6 +1,18 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { AgGridReact } from "ag-grid-react";
+import {
+  ColDef,
+  GridReadyEvent,
+  ModuleRegistry,
+  AllCommunityModule,
+} from "ag-grid-community";
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
+
+ModuleRegistry.registerModules([AllCommunityModule]);
+import { format } from "date-fns";
 import {
   InventoryItem,
   Category,
@@ -38,6 +50,22 @@ import {
   AlertTriangle,
   Filter,
 } from "lucide-react";
+
+// Badge color classes for transaction type, keyed the same way the old table used them.
+function getTransactionTypeBadgeClass(type: string): string {
+  switch (type) {
+    case "Replenishment":
+      return "bg-emerald-50 text-emerald-700";
+    case "Automatic POS Deduction":
+      return "bg-sky-50 text-sky-700";
+    case "Manual Adjustment":
+      return "bg-amber-50 text-amber-700";
+    case "Waste / Spoilage":
+      return "bg-rose-50 text-rose-700";
+    default:
+      return "bg-gray-50 text-gray-600";
+  }
+}
 
 export default function InventoryPage() {
   const { profile } = useProfile();
@@ -194,6 +222,125 @@ export default function InventoryPage() {
     return s === "Low Stock" || s === "Critical Stock" || s === "Out of Stock";
   }).length;
 
+  // AG Grid Configuration — Transactions Ledger
+  const transactionColDefs = useMemo<ColDef<InventoryTransaction>[]>(
+    () => [
+      {
+        field: "date",
+        headerName: "Date & Time",
+        minWidth: 190,
+        valueFormatter: (params) => {
+          try {
+            return format(new Date(params.value), "MMM dd, yyyy h:mm a");
+          } catch {
+            return params.value;
+          }
+        },
+      },
+      {
+        headerName: "Ingredient",
+        minWidth: 180,
+        valueGetter: (params) => {
+          if (!params.data) return "";
+          const item = items.find((i) => i.id === params.data!.ingredientId);
+          return item ? item.name : "Unknown Item";
+        },
+      },
+      {
+        field: "type",
+        headerName: "Type",
+        minWidth: 200,
+        cellRenderer: (params: any) => (
+          <div
+            style={{ display: "flex", alignItems: "center", height: "100%" }}
+          >
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getTransactionTypeBadgeClass(
+                params.value,
+              )}`}
+            >
+              {params.value}
+            </span>
+          </div>
+        ),
+      },
+      {
+        field: "quantityChanged",
+        headerName: "Change",
+        minWidth: 130,
+        type: "rightAligned",
+        cellRenderer: (params: any) => {
+          if (!params.data) return null;
+          const item = items.find((i) => i.id === params.data.ingredientId);
+          const unit = item ? item.unit : "";
+          const isPositive = params.value > 0;
+          return (
+            <span
+              className={`font-bold text-[13px] ${isPositive ? "text-emerald-600" : "text-rose-600"}`}
+            >
+              {isPositive ? "+" : ""}
+              {params.value.toLocaleString()} {unit}
+            </span>
+          );
+        },
+      },
+      {
+        field: "newStock",
+        headerName: "New Stock",
+        minWidth: 130,
+        type: "rightAligned",
+        cellRenderer: (params: any) => {
+          if (!params.data) return null;
+          const item = items.find((i) => i.id === params.data.ingredientId);
+          const unit = item ? item.unit : "";
+          return (
+            <span className="text-gray-500 text-[13px] font-medium">
+              {params.value.toLocaleString()} {unit}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: "Delivery Cost",
+        minWidth: 140,
+        type: "rightAligned",
+        valueGetter: (params) => params.data?.expenseDetails?.deliveryCost,
+        valueFormatter: (params) =>
+          params.value !== undefined && params.value !== null
+            ? `₱${Number(params.value).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+              })}`
+            : "—",
+      },
+      {
+        headerName: "Payment",
+        minWidth: 140,
+        valueGetter: (params) =>
+          params.data?.expenseDetails?.paymentMethod || "—",
+      },
+      {
+        headerName: "User",
+        minWidth: 140,
+        valueGetter: (params) => params.data?.userId ?? "—",
+      },
+    ],
+    [items],
+  );
+
+  const transactionDefaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+      suppressMovable: true,
+    }),
+    [],
+  );
+
+  const onTransactionsGridReady = useCallback((params: GridReadyEvent) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
   // Handlers for Drawer/Modal
   const handleOpenCreateModal = () => {
     setSelectedItem(null);
@@ -211,7 +358,7 @@ export default function InventoryPage() {
     if (selectedItem) {
       // Edit
       const supabase = createClient();
-      
+
       // If image URL changed, delete the old one
       if (
         selectedItem.imageUrl &&
@@ -225,7 +372,7 @@ export default function InventoryPage() {
           // Continue with update anyway
         }
       }
-      
+
       const { data, error } = await supabase
         .from("inventory_items")
         .update({
@@ -342,14 +489,14 @@ export default function InventoryPage() {
 
   const handleDeleteIngredient = async (id: string) => {
     const supabase = createClient();
-    
+
     // Get the item to retrieve its image URL before deleting
     const { data: item } = await supabase
       .from("inventory_items")
       .select("image_url")
       .eq("id", id)
       .single();
-    
+
     const { error } = await supabase
       .from("inventory_items")
       .delete()
@@ -363,7 +510,7 @@ export default function InventoryPage() {
       });
       return;
     }
-    
+
     // Delete the image from storage if it exists
     if (item?.image_url) {
       try {
@@ -617,9 +764,7 @@ export default function InventoryPage() {
                 : "Transaction History"}
             </p>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              {currentView === "inventory"
-                ? "Inventory"
-                : "Inventory Transactions"}
+              {currentView === "inventory" ? "Inventory" : ""}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {currentView === "inventory"
@@ -829,125 +974,28 @@ export default function InventoryPage() {
       ) : (
         /* Transactions View */
         <div className="flex-1 pb-10">
-          <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/80">
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Date & Time
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Ingredient
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
-                      Change
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
-                      New Stock
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">
-                      Delivery Cost
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Payment
-                    </th>
-                    <th className="px-5 py-3.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      User
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {transactions.length > 0 ? (
-                    transactions.map((txn) => {
-                      const item = items.find((i) => i.id === txn.ingredientId);
-                      const itemName = item ? item.name : "Unknown Item";
-                      const unit = item ? item.unit : "";
-                      const isPositive = txn.quantityChanged > 0;
-                      const cost = txn.expenseDetails?.deliveryCost;
-                      const payment = txn.expenseDetails?.paymentMethod;
-
-                      const getTypeBadge = () => {
-                        switch (txn.type) {
-                          case "Replenishment":
-                            return "bg-emerald-50 text-emerald-700";
-                          case "Automatic POS Deduction":
-                            return "bg-sky-50 text-sky-700";
-                          case "Manual Adjustment":
-                            return "bg-amber-50 text-amber-700";
-                          case "Waste / Spoilage":
-                            return "bg-rose-50 text-rose-700";
-                          default:
-                            return "bg-gray-50 text-gray-600";
-                        }
-                      };
-
-                      return (
-                        <tr
-                          key={txn.id}
-                          className="hover:bg-gray-50/60 transition-colors"
-                        >
-                          <td className="px-5 py-3.5 text-gray-500 whitespace-nowrap text-[13px]">
-                            {new Date(txn.date).toLocaleString([], {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })}
-                          </td>
-                          <td className="px-5 py-3.5 font-semibold text-[#3a2b27] text-[13px]">
-                            {itemName}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getTypeBadge()}`}
-                            >
-                              {txn.type}
-                            </span>
-                          </td>
-                          <td
-                            className={`px-5 py-3.5 text-right font-bold text-[13px] ${isPositive ? "text-emerald-600" : "text-rose-600"}`}
-                          >
-                            {isPositive ? "+" : ""}
-                            {txn.quantityChanged.toLocaleString()} {unit}
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-gray-500 text-[13px] font-medium">
-                            {txn.newStock.toLocaleString()} {unit}
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-gray-500 text-[13px]">
-                            {cost !== undefined
-                              ? `₱${cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                              : "—"}
-                          </td>
-                          <td className="px-5 py-3.5 text-gray-500 text-[13px]">
-                            {payment || "—"}
-                          </td>
-                          <td className="px-5 py-3.5 text-gray-500 text-[13px]">
-                            {txn.userId ?? "—"}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-16 text-center">
-                        <div className="flex flex-col items-center">
-                          <div className="p-4 bg-gray-100 rounded-2xl mb-4">
-                            <ClipboardList className="w-8 h-8 text-gray-300" />
-                          </div>
-                          <p className="font-semibold text-[#3a2b27] mb-1">
-                            No transactions yet
-                          </p>
-                          <p className="text-sm text-gray-400">
-                            Replenishment and deduction logs will appear here.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          <div
+            className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm"
+            style={{ height: 600 }}
+          >
+            <div
+              className="ag-theme-quartz"
+              style={{ height: "100%", width: "100%" }}
+            >
+              <AgGridReact
+                theme="legacy"
+                rowData={transactions}
+                columnDefs={transactionColDefs}
+                defaultColDef={transactionDefaultColDef}
+                pagination={true}
+                paginationPageSize={20}
+                onGridReady={onTransactionsGridReady}
+                suppressCellFocus={true}
+                animateRows={true}
+                rowHeight={52}
+                headerHeight={48}
+                overlayNoRowsTemplate='<div class="flex flex-col items-center justify-center p-8 text-center space-y-3"><h3 class="font-semibold text-lg">No transactions yet</h3><p class="text-sm text-muted-foreground">Replenishment and deduction logs will appear here.</p></div>'
+              />
             </div>
           </div>
         </div>
