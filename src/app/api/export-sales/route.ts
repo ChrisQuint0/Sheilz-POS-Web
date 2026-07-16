@@ -101,8 +101,46 @@ export async function GET(request: Request) {
       };
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(rowsToExport);
+    // ── Fetch Dashboard KPIs and Revenue Trend ──
+    const [kpisRes, trendRes] = await Promise.all([
+      supabase.rpc("get_dashboard_kpis"),
+      supabase.rpc("get_dashboard_revenue_trend"),
+    ]);
+
     const workbook = XLSX.utils.book_new();
+
+    // Sheet 1: Dashboard Summary (KPI Cards)
+    const kpiRow = kpisRes.data;
+    if (kpiRow) {
+      const kpiData = [
+        { Metric: "Today's Revenue", Value: `₱${Number(kpiRow.today_revenue || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` },
+        { Metric: "Yesterday's Revenue", Value: `₱${Number(kpiRow.yesterday_revenue || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` },
+        { Metric: "Revenue Change (%)", Value: `${kpiRow.revenue_change || 0}%` },
+        { Metric: "Today's Orders", Value: kpiRow.today_orders || 0 },
+        { Metric: "Yesterday's Orders", Value: kpiRow.yesterday_orders || 0 },
+        { Metric: "Orders Change (%)", Value: `${kpiRow.orders_change || 0}%` },
+        { Metric: "Avg. Order Value (Today)", Value: `₱${Number(kpiRow.today_avg_order || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` },
+        { Metric: "Avg. Order Value (Yesterday)", Value: `₱${Number(kpiRow.yesterday_avg_order || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` },
+        { Metric: "AOV Change (%)", Value: `${kpiRow.aov_change || 0}%` },
+      ];
+      const kpiSheet = XLSX.utils.json_to_sheet(kpiData);
+      XLSX.utils.book_append_sheet(workbook, kpiSheet, "Dashboard Summary");
+    }
+
+    // Sheet 2: Revenue Trend (7-day)
+    const trendData = trendRes.data;
+    if (trendData && trendData.length > 0) {
+      const trendRows = trendData.map((d: any) => ({
+        Day: d.day_label,
+        Date: d.day_date,
+        Revenue: Number(d.total_revenue || 0),
+      }));
+      const trendSheet = XLSX.utils.json_to_sheet(trendRows);
+      XLSX.utils.book_append_sheet(workbook, trendSheet, "Revenue Trend");
+    }
+
+    // Sheet 3: Sales History (individual orders)
+    const worksheet = XLSX.utils.json_to_sheet(rowsToExport);
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sales History");
 
     // Generate buffer
