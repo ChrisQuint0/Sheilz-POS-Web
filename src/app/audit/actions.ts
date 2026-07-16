@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/app/lib/supabase/server';
+import { createAdminClient } from '@/app/lib/supabase/admin';
 import type { AuditLog } from './data';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -215,11 +216,42 @@ function getCategoryForAction(action: string): import('./data').AuditCategory {
     case 'User Login':
     case 'User Logout':
     case 'Failed Login':
+    case 'Inactive Login Attempt':
     case 'Password Reset':
       return 'Authentication';
     case 'Report Exported':
       return 'Analytics';
     default:
       return 'System';
+  }
+}
+
+// ── Inactive Login Attempt (uses admin client, no session dependency) ─────────
+
+/**
+ * Logs an inactive user's login attempt using the admin client.
+ * This bypasses the need for a valid user session, since the inactive user
+ * is about to be signed out.
+ */
+export async function logInactiveLoginAttempt(
+  userId: string,
+  displayName: string,
+  email: string
+): Promise<void> {
+  const supabaseAdmin = createAdminClient();
+
+  const { error } = await supabaseAdmin.rpc('insert_audit_log', {
+    p_user_id: userId,
+    p_category: 'Authentication',
+    p_action: 'Inactive Login Attempt',
+    p_severity: 'High',
+    p_target_type: 'User',
+    p_target_id: null,
+    p_target_name: displayName || email,
+    p_details: { metadata: { email, user_id: userId } },
+  });
+
+  if (error) {
+    console.error('Failed to log inactive login attempt:', error.message);
   }
 }

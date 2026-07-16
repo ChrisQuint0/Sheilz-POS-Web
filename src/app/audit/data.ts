@@ -13,7 +13,7 @@ export type AuditCategory =
 
 export type AuditAction =
   // Authentication
-  | "User Login" | "User Logout" | "Failed Login" | "Password Reset"
+  | "User Login" | "User Logout" | "Failed Login" | "Inactive Login Attempt" | "Password Reset"
   // Sales
   | "Transaction Created" | "Transaction Edited" | "Transaction Deleted"
   | "Transaction Voided (Not Made)" | "Transaction Voided (Consumed)"
@@ -76,7 +76,7 @@ export const AUDIT_CATEGORIES: AuditCategory[] = [
 ]
 
 export const AUDIT_ACTIONS: AuditAction[] = [
-  "User Login", "User Logout", "Failed Login", "Password Reset",
+  "User Login", "User Logout", "Failed Login", "Inactive Login Attempt", "Password Reset",
   "Transaction Created", "Transaction Edited", "Transaction Deleted",
   "Transaction Voided (Not Made)", "Transaction Voided (Consumed)",
   "Ingredient Created", "Ingredient Updated", "Ingredient Deleted", "Inventory Replenished", "Inventory Adjusted",

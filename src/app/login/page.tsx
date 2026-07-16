@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/lib/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,10 +11,18 @@ import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Show error if redirected here by middleware due to inactive status
+  useEffect(() => {
+    if (searchParams.get('inactive') === 'true') {
+      setError('This account is no longer active.');
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +37,6 @@ export default function LoginPage() {
     });
 
     if (signInError) {
-      // Import dynamically to keep this mostly client side or just import at top. Let's use standard import.
-      // We will add the import at the top in a separate chunk, but for now we can just require it or use server action
       import('@/app/audit/actions').then(({ logAppEvent }) => {
         logAppEvent('Failed Login', 'Medium', 'User', email, { metadata: { error: signInError.message } });
       });
@@ -38,6 +44,30 @@ export default function LoginPage() {
       setError(signInError.message);
       setIsLoading(false);
       return;
+    }
+
+    // Check if the user's profile is active
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('status, display_name')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.status === 'Inactive') {
+        // Log the inactive login attempt before signing out
+        await import('@/app/audit/actions').then(({ logInactiveLoginAttempt }) => {
+          return logInactiveLoginAttempt(user.id, profile.display_name || email, email);
+        });
+
+        // Sign the user out immediately
+        await supabase.auth.signOut();
+
+        setError('This account is no longer active.');
+        setIsLoading(false);
+        return;
+      }
     }
 
     // Success — log it
