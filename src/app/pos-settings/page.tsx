@@ -286,7 +286,7 @@ export default function POSSettingsPage() {
         .select("image_url")
         .eq("id", savedProduct.id)
         .single();
-      
+
       // If image URL changed, delete the old one
       if (
         oldProduct?.image_url &&
@@ -300,7 +300,7 @@ export default function POSSettingsPage() {
           // Continue with update anyway
         }
       }
-      
+
       const { error } = await supabase
         .from("products")
         .update({
@@ -552,14 +552,14 @@ export default function POSSettingsPage() {
 
   const handleArchiveProduct = async (productId: string) => {
     const supabase = createClient();
-    
+
     // Get the product to retrieve its image URL before archiving
     const { data: product } = await supabase
       .from("products")
       .select("image_url")
       .eq("id", productId)
       .single();
-    
+
     const { error } = await supabase
       .from("products")
       .update({ archived_at: new Date().toISOString() })
@@ -569,7 +569,7 @@ export default function POSSettingsPage() {
       alert("Failed to archive product: " + error.message);
       return;
     }
-    
+
     // Delete the image from storage if it exists
     if (product?.image_url) {
       try {
@@ -585,6 +585,26 @@ export default function POSSettingsPage() {
       description:
         "The product has been removed from the active catalog. Sales history and recipes are preserved.",
     });
+  };
+
+  const handleToggleVisibility = async (
+    product: Product,
+    isVisible: boolean,
+  ) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("products")
+      .update({ is_visible: isVisible })
+      .eq("id", product.id);
+
+    if (error) {
+      alert("Failed to update product visibility: " + error.message);
+      return;
+    }
+
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, isVisible } : p)),
+    );
   };
 
   const handleUnarchiveProduct = async (productId: string) => {
@@ -777,6 +797,9 @@ export default function POSSettingsPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+                {/* 
+
+                // Seems redundant
 
                 <Select
                   value={selectedCategoryId}
@@ -798,7 +821,7 @@ export default function POSSettingsPage() {
                       </SelectItem>
                     ))}
                   </SelectContent>
-                </Select>
+                </Select> */}
 
                 <Button
                   className="h-9 px-5 bg-[#C2456A] hover:bg-[#a33858] text-white shadow-sm"
@@ -859,6 +882,7 @@ export default function POSSettingsPage() {
                     sizes={sizes}
                     temperatures={temperatures}
                     onClick={handleEditProduct}
+                    onToggleVisibility={handleToggleVisibility}
                   />
                 ))}
               </div>

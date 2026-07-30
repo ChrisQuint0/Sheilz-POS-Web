@@ -294,10 +294,7 @@ export function MoreSettingsModal({
       }
 
       if (data && data.length > 0) {
-        setSizes((prev) => [
-          ...prev,
-          { id: data[0].id, name: data[0].name },
-        ]);
+        setSizes((prev) => [...prev, { id: data[0].id, name: data[0].name }]);
       }
       setNewSizeName("");
     } catch (err) {
@@ -311,10 +308,7 @@ export function MoreSettingsModal({
   const handleDeleteSize = async (id: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from("sizes")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("sizes").delete().eq("id", id);
 
       if (error) {
         alert("Failed to delete size: " + error.message);

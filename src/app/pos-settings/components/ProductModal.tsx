@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -1246,23 +1245,6 @@ export function ProductModal({
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div className="bg-white rounded-xl border-2 border-[#C2456A]/15 p-5 shadow-sm flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base font-bold text-[#3a2b27]">
-                      Available in POS
-                    </Label>
-                    <p className="text-sm text-gray-400">
-                      Toggle off to hide from the mobile app catalog.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={editedProduct.isVisible}
-                    onCheckedChange={(checked) =>
-                      setEditedProduct({ ...editedProduct, isVisible: checked })
-                    }
-                  />
                 </div>
               </div>
             )}
