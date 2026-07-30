@@ -18,6 +18,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -33,7 +34,7 @@ import { AddTransactionModal } from "./components/add-transaction-modal";
 import { AuthorizationModal } from "./components/authorization-modal";
 import { TransactionDrawer } from "./components/transaction-drawer";
 import { MobileTransactionCard } from "./components/mobile-transaction-card";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { ExportModal } from "./components/export-modal";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useProfile } from "@/components/profile-provider";
@@ -230,6 +231,12 @@ export default function SalesHistoryPage() {
     fetchAllOrders();
   }, []);
 
+  // Unique cashier names derived from fetched transactions
+  const cashierOptions = useMemo(() => {
+    const unique = new Set(rowData.map((tx) => tx.cashier).filter(Boolean));
+    return Array.from(unique).sort();
+  }, [rowData]);
+
   // Apply filters to derive displayed data
   const filteredTransactions = useMemo(() => {
     return rowData.filter((tx) => {
@@ -242,8 +249,7 @@ export default function SalesHistoryPage() {
           tx.items.some((i) => i.name.toLowerCase().includes(lowerQ));
         if (!matchesGlobal) return false;
       }
-      if (statusFilter !== "All" && !tx.status.includes(statusFilter))
-        return false;
+      if (statusFilter !== "All" && tx.status !== statusFilter) return false;
       if (paymentFilter !== "All" && tx.paymentMethod !== paymentFilter)
         return false;
       if (cashierFilter !== "All" && tx.cashier !== cashierFilter) return false;
@@ -251,6 +257,12 @@ export default function SalesHistoryPage() {
         const today = new Date().toDateString();
         const txDate = new Date(tx.createdAt).toDateString();
         if (today !== txDate) return false;
+      } else if (dateFilter === "Past Week") {
+        const weekAgo = subDays(new Date(), 7);
+        if (new Date(tx.createdAt) < weekAgo) return false;
+      } else if (dateFilter === "Past Month") {
+        const monthAgo = subDays(new Date(), 30);
+        if (new Date(tx.createdAt) < monthAgo) return false;
       }
       return true;
     });
@@ -630,74 +642,125 @@ export default function SalesHistoryPage() {
 
         {/* Filter Bar */}
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 bg-card p-3 rounded-lg border shadow-sm">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search transactions..."
-              className="pl-9"
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-            />
+          <div className="flex flex-col gap-1 flex-1">
+            <Label
+              htmlFor="search-filter"
+              className="text-xs text-muted-foreground"
+            >
+              Search
+            </Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search-filter"
+                type="text"
+                placeholder="Search transactions..."
+                className="pl-9"
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+              />
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Select
-              value={statusFilter}
-              onValueChange={(val) => setStatusFilter(val ?? "All")}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Statuses</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Void">Voided</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={paymentFilter}
-              onValueChange={(val) => setPaymentFilter(val ?? "All")}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Payment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Payments</SelectItem>
-                {paymentMethods.map((method) => (
-                  <SelectItem key={method} value={method}>
-                    {method}
+            <div className="flex flex-col gap-1">
+              <Label
+                htmlFor="status-filter"
+                className="text-xs text-muted-foreground"
+              >
+                Status
+              </Label>
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => setStatusFilter(val ?? "All")}
+              >
+                <SelectTrigger id="status-filter" className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Statuses</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Void (Consumed)">
+                    Void (Consumed)
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  <SelectItem value="Void (Not Made)">
+                    Void (Not Made)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select
-              value={cashierFilter}
-              onValueChange={(val) => setCashierFilter(val ?? "All")}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Cashier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Cashiers</SelectItem>
-                <SelectItem value="Joshua T.">Joshua T.</SelectItem>
-                <SelectItem value="Maria R.">Maria R.</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1">
+              <Label
+                htmlFor="payment-filter"
+                className="text-xs text-muted-foreground"
+              >
+                Payment
+              </Label>
+              <Select
+                value={paymentFilter}
+                onValueChange={(val) => setPaymentFilter(val ?? "All")}
+              >
+                <SelectTrigger id="payment-filter" className="w-[140px]">
+                  <SelectValue placeholder="Payment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Payments</SelectItem>
+                  {paymentMethods.map((method) => (
+                    <SelectItem key={method} value={method}>
+                      {method}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select
-              value={dateFilter}
-              onValueChange={(val) => setDateFilter(val ?? "All")}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Time</SelectItem>
-                <SelectItem value="Today">Today</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1">
+              <Label
+                htmlFor="cashier-filter"
+                className="text-xs text-muted-foreground"
+              >
+                Cashier
+              </Label>
+              <Select
+                value={cashierFilter}
+                onValueChange={(val) => setCashierFilter(val ?? "All")}
+              >
+                <SelectTrigger id="cashier-filter" className="w-[140px]">
+                  <SelectValue placeholder="Cashier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Cashiers</SelectItem>
+                  {cashierOptions.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label
+                htmlFor="date-filter"
+                className="text-xs text-muted-foreground"
+              >
+                Date
+              </Label>
+              <Select
+                value={dateFilter}
+                onValueChange={(val) => setDateFilter(val ?? "All")}
+              >
+                <SelectTrigger id="date-filter" className="w-[140px]">
+                  <SelectValue placeholder="Date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Time</SelectItem>
+                  <SelectItem value="Today">Today</SelectItem>
+                  <SelectItem value="Past Week">Past Week</SelectItem>
+                  <SelectItem value="Past Month">Past Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
