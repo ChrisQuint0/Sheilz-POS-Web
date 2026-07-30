@@ -665,6 +665,7 @@ export default function Dashboard() {
                 <Button
                   variant="link"
                   className="text-sm text-primary hover:text-primary/80 p-0 h-auto w-full justify-center"
+                  nativeButton={false}
                   render={<Link href="/audit" onClick={(e) => handleRestrictedLinkClick(e, "/audit")} />}
                 >
                   View all activity
@@ -683,6 +684,7 @@ export default function Dashboard() {
               <Button
                 variant="link"
                 className="text-xs text-primary p-0 h-auto"
+                nativeButton={false}
                 render={<Link href="/inventory" onClick={(e) => handleRestrictedLinkClick(e, "/inventory")} />}
               >
                 Manage →
