@@ -44,6 +44,7 @@ import { createClient } from "@/app/lib/supabase/client";
 
 interface FormOrderItem {
   id: string;
+  productId: string | null;
   productName: string;
   size: string | null;
   temp: string | null;
@@ -278,6 +279,7 @@ export function MassUploadModal({
                 ...d.items,
                 {
                   id: makeItemId(),
+                  productId: null,
                   productName: "",
                   size: null,
                   temp: null,
@@ -317,12 +319,20 @@ export function MassUploadModal({
 
             if (field === "productName") {
               const product = products.find((p) => p.name === value);
-              if (product && product.variants.length > 0) {
-                const firstVariant = product.variants[0];
-                updated.size = firstVariant.size;
-                updated.temp = firstVariant.temp;
-                updated.unitPrice = firstVariant.price;
+              if (product) {
+                updated.productId = product.id;
+                if (product.variants.length > 0) {
+                  const firstVariant = product.variants[0];
+                  updated.size = firstVariant.size;
+                  updated.temp = firstVariant.temp;
+                  updated.unitPrice = firstVariant.price;
+                } else {
+                  updated.size = null;
+                  updated.temp = null;
+                  updated.unitPrice = 0;
+                }
               } else {
+                updated.productId = null;
                 updated.size = null;
                 updated.temp = null;
                 updated.unitPrice = 0;
@@ -428,6 +438,7 @@ export function MassUploadModal({
         // Insert order items
         const orderItemRows = draft.items.map((item) => ({
           order_id: orderData.id,
+          product_id: item.productId,
           name: item.productName,
           size: item.size || null,
           temperature: item.temp || null,
@@ -450,6 +461,7 @@ export function MassUploadModal({
           customerName: finalCustomerName,
           status: draft.status,
           items: draft.items.map((item) => ({
+            productId: item.productId ?? undefined,
             name: item.productName,
             size: item.size ?? "",
             temperature: item.temp ?? "",

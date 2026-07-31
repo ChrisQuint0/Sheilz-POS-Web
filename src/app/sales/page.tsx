@@ -106,6 +106,7 @@ export default function SalesHistoryPage() {
       .from("products")
       .select(
         `
+    id,
     name,
     product_categories ( name ),
     product_variants (
@@ -121,6 +122,7 @@ export default function SalesHistoryPage() {
       .then(({ data, error }) => {
         if (!error && data) {
           const mapped: Product[] = data.map((p: any) => ({
+            id: p.id,
             name: p.name,
             category: p.product_categories?.name ?? "Other",
             variants: (p.product_variants ?? []).map((v: any) => ({
@@ -150,6 +152,7 @@ export default function SalesHistoryPage() {
               `
               *,
               order_items (
+                product_id,
                 name,
                 quantity,
                 size,
@@ -194,6 +197,7 @@ export default function SalesHistoryPage() {
             lastModifiedBy: order.last_modified_by ?? "",
             lastModifiedAt: order.last_modified_at ?? "",
             items: (order.order_items ?? []).map((i: any) => ({
+              productId: i.product_id ?? undefined,
               name: i.name,
               qty: i.quantity,
               size: i.size ?? "",
@@ -383,6 +387,7 @@ export default function SalesHistoryPage() {
     // Step 2 — INSERT into order_items
     const orderItemRows = newTx.items.map((item) => ({
       order_id: orderData.id,
+      product_id: item.productId || null,
       name: item.name,
       size: item.size || null,
       temperature: item.temperature || null,

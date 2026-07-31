@@ -25,6 +25,7 @@ import { Product } from "./product-catalog";
 
 interface FormOrderItem {
   id: string;
+  productId: string | null;
   productName: string;
   size: string | null;
   temp: string | null;
@@ -65,6 +66,7 @@ export function AddTransactionModal({
       ...items,
       {
         id: `row-${Date.now()}-${Math.random()}`,
+        productId: null,
         productName: "",
         size: null,
         temp: null,
@@ -81,12 +83,20 @@ export function AddTransactionModal({
         const updated = { ...item, [field]: value };
         if (field === "productName") {
           const product = products.find((p) => p.name === value);
-          if (product && product.variants.length > 0) {
-            const firstVariant = product.variants[0];
-            updated.size = firstVariant.size;
-            updated.temp = firstVariant.temp;
-            updated.unitPrice = firstVariant.price;
+          if (product) {
+            updated.productId = product.id;
+            if (product.variants.length > 0) {
+              const firstVariant = product.variants[0];
+              updated.size = firstVariant.size;
+              updated.temp = firstVariant.temp;
+              updated.unitPrice = firstVariant.price;
+            } else {
+              updated.size = null;
+              updated.temp = null;
+              updated.unitPrice = 0;
+            }
           } else {
+            updated.productId = null;
             updated.size = null;
             updated.temp = null;
             updated.unitPrice = 0;
@@ -124,6 +134,7 @@ export function AddTransactionModal({
     const orderId = `${yyyy}${mm}${dd}-${randomSuffix}`;
 
     const parsedItems: OrderItem[] = items.map((item) => ({
+      productId: item.productId ?? undefined,
       name: item.productName,
       size: item.size ?? "",
       temperature: item.temp ?? "",

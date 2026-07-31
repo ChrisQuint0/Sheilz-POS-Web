@@ -2,6 +2,7 @@ export type OrderStatus = "Completed" | "Void (Not Made)" | "Void (Consumed)";
 export type PaymentMethod = string;
 
 export type OrderItem = {
+  productId?: string;
   name: string;
   qty: number;
   size: string;
