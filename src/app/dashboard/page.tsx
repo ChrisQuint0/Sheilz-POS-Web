@@ -89,6 +89,10 @@ interface AuditLogEntry {
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: {
+    duration: 600,
+    easing: "easeOutQuart" as const,
+  },
   plugins: {
     legend: { display: false },
     tooltip: {
@@ -639,7 +643,7 @@ export default function Dashboard() {
             )}
           </CardHeader>
           <CardContent className="flex-1 min-h-[280px]">
-            {loading || trendLoading ? (
+            {loading ? (
               <div className="flex flex-col justify-end h-full gap-2 pb-6">
                 <div className="flex items-end gap-3 h-full">
                   {[40, 55, 70, 60, 80, 90, 75].map((h, i) => (
@@ -657,7 +661,9 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : revenueTrend.length > 0 ? (
-              <Line data={chartData} options={chartOptions as any} />
+              <div className="relative h-full w-full transition-opacity duration-200" style={{ opacity: trendLoading ? 0.7 : 1 }}>
+                <Line data={chartData} options={chartOptions as any} />
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                 No revenue data for this week yet.
