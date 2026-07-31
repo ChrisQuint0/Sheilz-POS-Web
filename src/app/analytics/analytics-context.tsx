@@ -184,8 +184,16 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     // Build date range as ISO timestamps or null for "all time"
-    const dateFrom = filters.dateFrom ? `${filters.dateFrom}T00:00:00.000Z` : null;
-    const dateTo = filters.dateTo ? `${filters.dateTo}T23:59:59.999Z` : null;
+    const dateFrom = filters.dateFrom ? `${filters.dateFrom}T00:00:00.000+08:00` : null;
+    let dateTo = null;
+    if (filters.dateTo) {
+      const d = new Date(filters.dateTo);
+      d.setDate(d.getDate() + 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      dateTo = `${y}-${m}-${day}T00:00:00.000+08:00`;
+    }
 
     try {
       const filterParams = {
