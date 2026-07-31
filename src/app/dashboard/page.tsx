@@ -16,6 +16,8 @@ import {
   Coffee,
   Download,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -206,6 +208,25 @@ export default function Dashboard() {
   const [stockAlertCount, setStockAlertCount] = useState(0);
   const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [dayOffset, setDayOffset] = useState(0);
+  const [trendLoading, setTrendLoading] = useState(false);
+
+  // Fetch just the revenue trend for a given day offset
+  const fetchRevenueTrend = useCallback(async (offset: number) => {
+    setTrendLoading(true);
+    const supabase = createClient();
+    try {
+      const trendRes = await supabase.rpc("get_dashboard_revenue_trend", {
+        p_day_offset: offset,
+      });
+      if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
+      if (trendRes.error) console.error("Revenue trend error:", trendRes.error);
+    } catch (err) {
+      console.error("Revenue trend fetch error:", err);
+    } finally {
+      setTrendLoading(false);
+    }
+  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -215,7 +236,7 @@ export default function Dashboard() {
       const [kpisRes, trendRes, lowStockRes, alertCountRes, activityRes] =
         await Promise.all([
           supabase.rpc("get_dashboard_kpis"),
-          supabase.rpc("get_dashboard_revenue_trend"),
+          supabase.rpc("get_dashboard_revenue_trend", { p_day_offset: 0 }),
           supabase.rpc("get_low_stock_items", { p_limit: 3 }),
           supabase.rpc("get_stock_alert_count"),
           supabase
@@ -244,12 +265,41 @@ export default function Dashboard() {
       console.error("Dashboard fetch error:", err);
     } finally {
       setLoading(false);
+      setDayOffset(0);
     }
   }, []);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // Navigate days
+  const goToPreviousDay = () => {
+    const newOffset = dayOffset - 1;
+    setDayOffset(newOffset);
+    fetchRevenueTrend(newOffset);
+  };
+
+  const goToNextDay = () => {
+    if (dayOffset >= 0) return;
+    const newOffset = dayOffset + 1;
+    setDayOffset(newOffset);
+    fetchRevenueTrend(newOffset);
+  };
+
+  // Compute the label from the trend data or the offset
+  const getDateLabel = () => {
+    if (dayOffset === 0) return "This week";
+    // For any offset, show the date range from the trend data
+    if (revenueTrend.length >= 2) {
+      const start = new Date(revenueTrend[0].day_date);
+      const end = new Date(revenueTrend[revenueTrend.length - 1].day_date);
+      const fmt = (d: Date) =>
+        d.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+      return `${fmt(start)} – ${fmt(end)}`;
+    }
+    return `${Math.abs(dayOffset)} days ago`;
+  };
 
   // Build chart data from revenue trend
   const chartData = {
@@ -553,11 +603,29 @@ export default function Dashboard() {
               <CardTitle className="text-base font-semibold">
                 Revenue Trend
               </CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                This week · PHP
-              </p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <button
+                  onClick={goToPreviousDay}
+                  disabled={trendLoading}
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Previous day"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="text-xs font-medium text-muted-foreground min-w-[90px] text-center">
+                  {getDateLabel()}
+                </span>
+                <button
+                  onClick={goToNextDay}
+                  disabled={trendLoading || dayOffset >= 0}
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Next day"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-            {!loading && peakDay && Number(peakDay.total_revenue) > 0 && (
+            {!loading && !trendLoading && peakDay && Number(peakDay.total_revenue) > 0 && (
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Peak day</p>
                 <p className="text-sm font-semibold text-foreground">
@@ -571,7 +639,7 @@ export default function Dashboard() {
             )}
           </CardHeader>
           <CardContent className="flex-1 min-h-[280px]">
-            {loading ? (
+            {loading || trendLoading ? (
               <div className="flex flex-col justify-end h-full gap-2 pb-6">
                 <div className="flex items-end gap-3 h-full">
                   {[40, 55, 70, 60, 80, 90, 75].map((h, i) => (
