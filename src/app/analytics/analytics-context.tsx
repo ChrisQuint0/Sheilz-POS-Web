@@ -131,12 +131,25 @@ const AnalyticsContext = createContext<AnalyticsContextType | null>(null);
 // ────────────────────────────────────────────────
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  const [filters, setFilters] = useState<AnalyticsFilters>({
-    dateFrom: "",
-    dateTo: "",
-    category: "all",
-    paymentMethod: "all",
-    cashier: "all",
+  const [filters, setFilters] = useState<AnalyticsFilters>(() => {
+    const today = new Date();
+    const past = new Date(today);
+    past.setMonth(today.getMonth() - 3);
+
+    const formatDate = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    };
+
+    return {
+      dateFrom: formatDate(past),
+      dateTo: formatDate(today),
+      category: "all",
+      paymentMethod: "all",
+      cashier: "all",
+    };
   });
   const [data, setData] = useState<AnalyticsData>(emptyData);
   const [loading, setLoading] = useState(true);
