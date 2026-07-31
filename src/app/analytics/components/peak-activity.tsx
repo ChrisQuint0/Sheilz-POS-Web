@@ -26,7 +26,7 @@ export function PeakActivity() {
   const peakDays = data.peakDays;
 
   // Filter out empty hours from the chart by finding the first and last non-zero hours
-  // If there's no data, default to 6 AM - 8 PM
+  // If there's no data, default to 9 AM - 9 PM 
   let firstNonZeroIdx = -1;
   let lastNonZeroIdx = -1;
 
