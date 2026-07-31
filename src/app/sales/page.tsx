@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Download, Plus, Trash2 } from "lucide-react";
+import { Search, Download, Plus, Trash2, Upload } from "lucide-react";
 
 import { Transaction, OrderItem } from "./data";
 import { createClient } from "@/app/lib/supabase/client";
@@ -36,6 +36,7 @@ import { TransactionDrawer } from "./components/transaction-drawer";
 import { MobileTransactionCard } from "./components/mobile-transaction-card";
 import { format, subDays } from "date-fns";
 import { ExportModal } from "./components/export-modal";
+import { MassUploadModal } from "./components/mass-upload-modal";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useProfile } from "@/components/profile-provider";
 import { Product } from "./components/product-catalog";
@@ -71,6 +72,7 @@ export default function SalesHistoryPage() {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isMassUploadOpen, setIsMassUploadOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [authModal, setAuthModal] = useState<{
     isOpen: boolean;
@@ -633,6 +635,10 @@ export default function SalesHistoryPage() {
               <Download className="h-4 w-4 mr-2" />
               Export Excel
             </Button>
+            <Button variant="outline" onClick={() => setIsMassUploadOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Mass Upload
+            </Button>
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Transaction
@@ -846,6 +852,16 @@ export default function SalesHistoryPage() {
         onClose={() => setIsExportModalOpen(false)}
         onExport={triggerExport}
         isLoading={isExporting}
+      />
+      <MassUploadModal
+        isOpen={isMassUploadOpen}
+        onClose={() => setIsMassUploadOpen(false)}
+        onUploaded={(newTxs) => {
+          setRowData((prev) => [...newTxs, ...prev]);
+        }}
+        currentUser={currentUser}
+        paymentMethods={paymentMethods}
+        products={products}
       />
       <TransactionDrawer
         transaction={drawerTx}
