@@ -71,7 +71,7 @@ export function ProductPerformance() {
       x: {
         grid: { color: "rgba(194,69,106,0.06)" },
         border: { display: false },
-        ticks: { color: "#826f69", font: { size: 11 } },
+        ticks: { color: "#826f69", font: { size: 11 }, precision: 0 },
       },
       y: {
         grid: { display: false },

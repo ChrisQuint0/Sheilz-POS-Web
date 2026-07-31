@@ -80,6 +80,35 @@ export const defaultChartOptions = {
   },
 };
 
+/**
+ * Smart currency tick formatter that adapts to the data magnitude.
+ * - Under 1,000: shows raw value (e.g., "₱500")
+ * - 1,000 to 999,999: shows in thousands (e.g., "₱1.5k", "₱25k")
+ * - 1,000,000+: shows in millions (e.g., "₱1.2M")
+ * Avoids misleading labels like "₱0k" for small values.
+ */
+export function formatCurrencyTick(value: number | string): string {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return `₱0`;
+
+  const abs = Math.abs(num);
+
+  if (abs >= 1_000_000) {
+    // Millions: show 1 decimal if fractional, otherwise whole
+    const m = num / 1_000_000;
+    return m % 1 === 0 ? `₱${m}M` : `₱${m.toFixed(1)}M`;
+  }
+
+  if (abs >= 1_000) {
+    // Thousands: show 1 decimal if fractional, otherwise whole
+    const k = num / 1_000;
+    return k % 1 === 0 ? `₱${k}k` : `₱${k.toFixed(1)}k`;
+  }
+
+  // Under 1,000: show raw value, no decimals
+  return `₱${Math.round(num)}`;
+}
+
 export const chartColors = {
   primary: "#c2456a",
   primaryLight: "rgba(194, 69, 106, 0.12)",

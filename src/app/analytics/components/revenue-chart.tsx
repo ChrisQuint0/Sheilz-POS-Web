@@ -2,7 +2,7 @@
 
 import { Line } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { defaultChartOptions, chartColors } from "./chart-setup";
+import { defaultChartOptions, chartColors, formatCurrencyTick } from "./chart-setup";
 import { TrendingUp, Loader2 } from "lucide-react";
 import { useAnalytics } from "../analytics-context";
 
@@ -63,7 +63,7 @@ export function RevenueChart() {
         ...defaultChartOptions.scales.y,
         ticks: {
           ...defaultChartOptions.scales.y.ticks,
-          callback: (value: any) => `₱${(value / 1000).toFixed(0)}k`,
+          callback: (value: any) => formatCurrencyTick(value),
         },
       },
     },
