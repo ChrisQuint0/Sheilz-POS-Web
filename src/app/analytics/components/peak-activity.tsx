@@ -25,10 +25,26 @@ export function PeakActivity() {
   const peakHours = data.peakHours;
   const peakDays = data.peakDays;
 
-  // Filter out 12AM to 5AM from the chart since it's mostly 0s, unless there are orders
-  // Find first non-zero and last non-zero to bound it, or use a default range like 6 AM - 8 PM
-  let startIdx = 6; // 6 AM
-  let endIdx = 20; // 8 PM
+  // Filter out empty hours from the chart by finding the first and last non-zero hours
+  // If there's no data, default to 6 AM - 8 PM
+  let firstNonZeroIdx = -1;
+  let lastNonZeroIdx = -1;
+
+  for (let i = 0; i < peakHours.length; i++) {
+    if (Number(peakHours[i].order_count) > 0) {
+      if (firstNonZeroIdx === -1) firstNonZeroIdx = i;
+      lastNonZeroIdx = i;
+    }
+  }
+
+  let startIdx = 9; // 9 AM default
+  let endIdx = 21; // 9 PM default
+
+  if (firstNonZeroIdx !== -1) {
+    // Add 1 hour padding if possible to make the chart look better
+    startIdx = Math.max(0, firstNonZeroIdx - 1);
+    endIdx = Math.min(peakHours.length - 1, lastNonZeroIdx + 1);
+  }
   
   const lineLabels = peakHours.slice(startIdx, endIdx + 1).map(h => h.hour_label);
   const lineValues = peakHours.slice(startIdx, endIdx + 1).map(h => Number(h.order_count));
