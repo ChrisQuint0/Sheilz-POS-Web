@@ -119,23 +119,32 @@ export default function TeamPage() {
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 pb-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Team</h1>
-          <p className="text-sm text-muted-foreground">Manage staff accounts, permissions, and system access.</p>
-        </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsImportModalOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import Users
-            </Button>
-            <Button className="w-full md:w-auto" onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
+      <div className="flex flex-col gap-6 p-6 pb-4">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b border-[#C2456A]/10">
+          <div>
+            <p className="text-xs font-medium text-[#C2456A] uppercase tracking-widest mb-1">
+              Staff Management
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Team
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage staff accounts, permissions, and system access.
+            </p>
           </div>
-        )}
+          {isAdmin && (
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" className="bg-background" onClick={() => setIsImportModalOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import Users
+              </Button>
+              <Button onClick={() => setIsAddModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters Toolbar */}
