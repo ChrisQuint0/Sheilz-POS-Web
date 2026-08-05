@@ -102,33 +102,33 @@ export function AuthorizationModal({
                 {isDelete ? "Authorize Deletion" : "Authorize Edit"}
               </DialogTitle>
               <DialogDescription className="pt-2 text-sm text-muted-foreground">
-                <div className="space-y-2">
+                <span className="space-y-2 block">
                   {isDelete ? (
                     <>
-                      <div>
+                      <span className="block">
                         Deleting transaction records may permanently affect
                         reporting accuracy, revenue calculations, inventory
                         consumption records, and analytics.
-                      </div>
-                      <div className="font-semibold text-foreground">
+                      </span>
+                      <span className="font-semibold text-foreground block">
                         This action cannot be undone. All deletions will be
                         recorded in the audit logs.
-                      </div>
+                      </span>
                     </>
                   ) : (
                     <>
-                      <div>
+                      <span className="block">
                         Editing transaction records can affect reports,
                         analytics, inventory calculations, and financial data.
-                      </div>
-                      <div className="font-semibold text-foreground">
+                      </span>
+                      <span className="font-semibold text-foreground block">
                         Proceed only if this correction is absolutely necessary.
                         This action will be permanently recorded in the audit
                         logs.
-                      </div>
+                      </span>
                     </>
                   )}
-                </div>
+                </span>
               </DialogDescription>
             </DialogHeader>
 

@@ -544,7 +544,7 @@ export function MassUploadModal({
       <DialogContent className="sm:max-w-[1100px] max-h-[92vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <DialogTitle>Mass Upload Orders</DialogTitle>
+            <DialogTitle>Bulk Add Orders</DialogTitle>
             {counts.total > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 {counts.draft > 0 && (

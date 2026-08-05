@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Download, Plus, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 import { Transaction, OrderItem } from "./data";
 import { createClient } from "@/app/lib/supabase/client";
@@ -323,7 +324,7 @@ export default function SalesHistoryPage() {
 
       if (!response.ok) {
         if (response.status === 404) {
-          alert("No transactions found for the selected date range.");
+          toast.error("No transactions found for the selected date range.");
         } else {
           const errorData = await response.json().catch(() => null);
           alert(errorData?.error || "Failed to export data.");
@@ -431,6 +432,33 @@ export default function SalesHistoryPage() {
     if (actionType === "delete" && targetTx) {
       const txsToDelete = Array.isArray(targetTx) ? targetTx : [targetTx];
       const idsToDelete = new Set(txsToDelete.map((t) => t.id));
+
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("orders")
+        .delete()
+        .in("id", Array.from(idsToDelete));
+
+      if (error) {
+        toast.error(`Failed to delete transactions: ${error.message}`);
+        setAuthModal({ isOpen: false, actionType: "delete" });
+        return;
+      }
+
+      await import("@/app/audit/actions").then(async ({ logAppEvent }) => {
+        for (const tx of txsToDelete) {
+          await logAppEvent(
+            "Transaction Deleted",
+            "High",
+            "Transaction",
+            tx.orderId,
+            { previousValue: tx }
+          );
+        }
+      });
+
+      toast.success(`${txsToDelete.length} transaction(s) deleted successfully.`);
+
       setRowData((prev) => prev.filter((tx) => !idsToDelete.has(tx.id)));
 
       if (drawerTx && idsToDelete.has(drawerTx.id)) {
@@ -450,10 +478,25 @@ export default function SalesHistoryPage() {
         .eq("id", targetTx.id);
 
       if (error) {
-        alert(`Failed to save changes: ${error.message}`);
+        toast.error(`Failed to save changes: ${error.message}`);
         setAuthModal({ isOpen: false, actionType: "delete" });
         return;
       }
+
+      await import("@/app/audit/actions").then(async ({ logAppEvent }) => {
+        await logAppEvent(
+          "Transaction Edited",
+          "Medium",
+          "Transaction",
+          targetTx.orderId,
+          { 
+            previousValue: { customerName: targetTx.customerName, status: targetTx.status, paymentMethod: targetTx.paymentMethod },
+            newValue: { customerName: targetTx.customerName, status: targetTx.status, paymentMethod: targetTx.paymentMethod }
+          }
+        );
+      });
+
+      toast.success("Transaction updated successfully.");
 
       const updated = {
         ...targetTx,
@@ -648,7 +691,7 @@ export default function SalesHistoryPage() {
               </Button>
               <Button variant="outline" className="bg-background" onClick={() => setIsMassUploadOpen(true)}>
                 <Upload className="h-4 w-4 mr-2" />
-                Mass Upload
+                Bulk Add
               </Button>
               <Button onClick={() => setIsAddModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
