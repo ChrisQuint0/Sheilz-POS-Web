@@ -215,18 +215,104 @@ export default function Dashboard() {
   const [dayOffset, setDayOffset] = useState(0);
   const [trendLoading, setTrendLoading] = useState(false);
 
-  // Fetch just the revenue trend for a given day offset
-  const fetchRevenueTrend = useCallback(async (offset: number) => {
+  // Fetch data for a given day offset
+  const fetchOffsetData = useCallback(async (offset: number) => {
     setTrendLoading(true);
     const supabase = createClient();
     try {
-      const trendRes = await supabase.rpc("get_dashboard_revenue_trend", {
-        p_day_offset: offset,
-      });
+      const [trendRes, kpisRes] = await Promise.all([
+        supabase.rpc("get_dashboard_revenue_trend", { p_day_offset: offset }),
+        offset === 0 
+          ? supabase.rpc("get_dashboard_kpis") 
+          : supabase.rpc("get_dashboard_kpis", { p_day_offset: offset }),
+      ]);
+      
       if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
       if (trendRes.error) console.error("Revenue trend error:", trendRes.error);
+
+      // If the RPC call succeeded (meaning the backend migration is applied or offset is 0)
+      if (!kpisRes.error && kpisRes.data) {
+        setKpis(kpisRes.data as DashboardKpis);
+      } 
+      // Fallback: If the migration hasn't been deployed yet, compute KPIs in the frontend for offset !== 0
+      else if (kpisRes.error && offset !== 0) {
+        console.warn("RPC get_dashboard_kpis with offset failed, falling back to frontend computation.");
+        
+        // Calculate Manila midnight timestamps for the week boundaries
+        const now = new Date();
+        const manilaFormatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Manila",
+          year: "numeric", month: "2-digit", day: "2-digit"
+        });
+        const parts = manilaFormatter.formatToParts(now);
+        const y = parseInt(parts.find(p => p.type === "year")!.value);
+        const m = parseInt(parts.find(p => p.type === "month")!.value) - 1;
+        const d = parseInt(parts.find(p => p.type === "day")!.value);
+        
+        const manilaMidnight = new Date(Date.UTC(y, m, d, -8, 0, 0, 0)); // UTC time of Manila midnight
+        
+        // Shift to Sunday of the current week
+        const dayOfWeek = new Date(y, m, d).getDay(); // 0 is Sunday
+        const baseStart = new Date(manilaMidnight);
+        baseStart.setUTCDate(baseStart.getUTCDate() - dayOfWeek);
+        
+        const currStart = new Date(baseStart);
+        currStart.setUTCDate(currStart.getUTCDate() + offset);
+        
+        const currEnd = new Date(currStart);
+        currEnd.setUTCDate(currEnd.getUTCDate() + 7);
+        
+        const prevStart = new Date(currStart);
+        prevStart.setUTCDate(prevStart.getUTCDate() - 7);
+        
+        const prevEnd = new Date(currStart);
+
+        const [currOrdersRes, prevOrdersRes] = await Promise.all([
+          supabase
+            .from("orders")
+            .select("amount")
+            .eq("status", "Completed")
+            .gte("created_at", currStart.toISOString())
+            .lt("created_at", currEnd.toISOString()),
+          supabase
+            .from("orders")
+            .select("amount")
+            .eq("status", "Completed")
+            .gte("created_at", prevStart.toISOString())
+            .lt("created_at", prevEnd.toISOString()),
+        ]);
+
+        const currOrders = currOrdersRes.data || [];
+        const prevOrders = prevOrdersRes.data || [];
+
+        const todayRevenue = currOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+        const todayOrders = currOrders.length;
+        const todayAvgOrder = todayOrders > 0 ? todayRevenue / todayOrders : 0;
+
+        const yestRevenue = prevOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+        const yestOrders = prevOrders.length;
+        const yestAvgOrder = yestOrders > 0 ? yestRevenue / yestOrders : 0;
+
+        const revenueChange = yestRevenue > 0 ? ((todayRevenue - yestRevenue) / yestRevenue) * 100 : 0;
+        const ordersChange = yestOrders > 0 ? ((todayOrders - yestOrders) / yestOrders) * 100 : 0;
+        const aovChange = yestAvgOrder > 0 ? ((todayAvgOrder - yestAvgOrder) / yestAvgOrder) * 100 : 0;
+
+        setKpis({
+          today_revenue: todayRevenue,
+          today_orders: todayOrders,
+          today_avg_order: todayAvgOrder,
+          yesterday_revenue: yestRevenue,
+          yesterday_orders: yestOrders,
+          yesterday_avg_order: yestAvgOrder,
+          revenue_change: Number(revenueChange.toFixed(1)),
+          orders_change: Number(ordersChange.toFixed(1)),
+          aov_change: Number(aovChange.toFixed(1)),
+        });
+      } else if (kpisRes.error) {
+        console.error("KPIs error:", kpisRes.error);
+      }
     } catch (err) {
-      console.error("Revenue trend fetch error:", err);
+      console.error("Offset data fetch error:", err);
     } finally {
       setTrendLoading(false);
     }
@@ -278,17 +364,17 @@ export default function Dashboard() {
   }, [fetchDashboardData]);
 
   // Navigate days
-  const goToPreviousDay = () => {
-    const newOffset = dayOffset - 1;
+  const goToPreviousPeriod = () => {
+    const newOffset = dayOffset - 7;
     setDayOffset(newOffset);
-    fetchRevenueTrend(newOffset);
+    fetchOffsetData(newOffset);
   };
 
-  const goToNextDay = () => {
+  const goToNextPeriod = () => {
     if (dayOffset >= 0) return;
-    const newOffset = dayOffset + 1;
+    const newOffset = dayOffset + 7;
     setDayOffset(newOffset);
-    fetchRevenueTrend(newOffset);
+    fetchOffsetData(newOffset);
   };
 
   // Compute the label from the trend data or the offset
@@ -459,18 +545,20 @@ export default function Dashboard() {
                     {(kpis?.revenue_change ?? 0) >= 0 ? "+" : ""}
                     {kpis?.revenue_change ?? 0}%
                   </span>
-                  <span className="text-xs text-white/60">vs. yesterday</span>
+                  <span className="text-xs text-white/60">
+                    {dayOffset === 0 ? "vs. yesterday" : "vs. previous week"}
+                  </span>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* Orders Today */}
+        {/* Orders */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              Orders Today
+              {dayOffset === 0 ? "Orders Today" : "Total Orders"}
             </CardTitle>
             <div className="bg-muted p-1.5 rounded-md">
               <ShoppingBag className="h-4 w-4 text-foreground/70" />
@@ -503,7 +591,7 @@ export default function Dashboard() {
                     {kpis?.orders_change ?? 0}%
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    vs. {kpis?.yesterday_orders ?? 0} yesterday
+                    vs. {kpis?.yesterday_orders ?? 0} {dayOffset === 0 ? "yesterday" : "last week"}
                   </span>
                 </div>
               </>
@@ -556,7 +644,7 @@ export default function Dashboard() {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
                     })}{" "}
-                    yesterday
+                    {dayOffset === 0 ? "yesterday" : "last week"}
                   </span>
                 </div>
               </>
@@ -609,10 +697,10 @@ export default function Dashboard() {
               </CardTitle>
               <div className="flex items-center gap-1.5 mt-1">
                 <button
-                  onClick={goToPreviousDay}
+                  onClick={goToPreviousPeriod}
                   disabled={trendLoading}
                   className="inline-flex items-center justify-center h-6 w-6 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Previous day"
+                  aria-label="Previous period"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
@@ -620,10 +708,10 @@ export default function Dashboard() {
                   {getDateLabel()}
                 </span>
                 <button
-                  onClick={goToNextDay}
+                  onClick={goToNextPeriod}
                   disabled={trendLoading || dayOffset >= 0}
                   className="inline-flex items-center justify-center h-6 w-6 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Next day"
+                  aria-label="Next period"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
