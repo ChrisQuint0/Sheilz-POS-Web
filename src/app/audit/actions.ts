@@ -101,6 +101,12 @@ export async function fetchAuditLogs(
         query = query.gte('created_at', last30.toISOString());
         break;
       }
+      case 'Last 90 Days': {
+        const last90 = new Date(todayStart);
+        last90.setDate(last90.getDate() - 90);
+        query = query.gte('created_at', last90.toISOString());
+        break;
+      }
       case 'This Month': {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         query = query.gte('created_at', monthStart.toISOString());

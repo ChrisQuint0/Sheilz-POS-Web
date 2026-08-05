@@ -11,9 +11,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Download, RefreshCw, Filter, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import * as XLSX from "xlsx"
+import { ExportModal, type ExportDatePreset } from "./components/export-modal"
+import { exportAuditToExcel } from "./export-excel"
+import { exportAuditToCSV } from "./export-csv"
 
-type DatePreset = "All" | "Today" | "Yesterday" | "Last 7 Days" | "Last 30 Days" | "This Month" | "Custom"
+type DatePreset = "All" | "Today" | "Yesterday" | "Last 7 Days" | "Last 30 Days" | "Last 90 Days" | "This Month" | "Custom"
 
 export default function AuditPage() {
   // Data state
@@ -28,13 +30,18 @@ export default function AuditPage() {
   const [datePreset, setDatePreset] = useState<DatePreset>("All")
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
-  const [userFilter, setUserFilter] = useState<string>("All")
-  const [categoryFilter, setCategoryFilter] = useState<string>("All")
-  const [actionFilter, setActionFilter] = useState<string>("All")
-  const [severityFilter, setSeverityFilter] = useState<string>("All")
+  const [userFilter, setUserFilter] = useState<string>("All Users")
+  const [categoryFilter, setCategoryFilter] = useState<string>("All Categories")
+  const [actionFilter, setActionFilter] = useState<string>("All Actions")
+  const [severityFilter, setSeverityFilter] = useState<string>("All Severities")
 
   // User list for filter dropdown
   const [userOptions, setUserOptions] = useState<{ id: string; name: string }[]>([])
+
+  // Export Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx" | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Drawer State
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
@@ -61,10 +68,10 @@ export default function AuditPage() {
   const buildFilters = useCallback((): AuditFilters => {
     return {
       search: debouncedSearch || undefined,
-      category: categoryFilter !== "All" ? categoryFilter : undefined,
-      action: actionFilter !== "All" ? actionFilter : undefined,
-      severity: severityFilter !== "All" ? severityFilter : undefined,
-      userId: userFilter !== "All" ? userFilter : undefined,
+      category: categoryFilter !== "All Categories" ? categoryFilter : undefined,
+      action: actionFilter !== "All Actions" ? actionFilter : undefined,
+      severity: severityFilter !== "All Severities" ? severityFilter : undefined,
+      userId: userFilter !== "All Users" ? userFilter : undefined,
       datePreset: datePreset !== "All" ? datePreset : undefined,
       customStartDate: datePreset === "Custom" ? customStartDate : undefined,
       customEndDate: datePreset === "Custom" ? customEndDate : undefined,
@@ -123,25 +130,54 @@ export default function AuditPage() {
     loadLogs(true)
   }
 
-  const handleExport = (format: "csv" | "xlsx") => {
-    const dataToExport = logs.map(log => ({
-      Timestamp: new Date(log.created_at).toLocaleString(),
-      User: log.user_name,
-      Role: log.user_role,
-      Category: log.category,
-      Action: log.action,
-      Target: log.target_name ? `${log.target_type}: ${log.target_name}` : "-",
-      "Target ID": log.target_id ?? "-",
-      Severity: log.severity,
-      "IP Address": log.ip_address ?? "-",
-      Device: log.device ?? "-",
-    }))
+  const handleExportClick = (format: "csv" | "xlsx") => {
+    setExportFormat(format)
+    setIsExportModalOpen(true)
+  }
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Audit Logs")
+  const handleExportExecute = async (startDate: string, endDate: string, preset: ExportDatePreset) => {
+    setIsExporting(true)
+    
+    // Create new filters for export overriding the date preset
+    const exportFilters: AuditFilters = {
+      ...buildFilters(),
+      page: 1,
+      pageSize: 100000, // fetch as many as possible for export
+    }
+    
+    if (preset === "All Time") {
+      exportFilters.datePreset = undefined;
+      exportFilters.customStartDate = undefined;
+      exportFilters.customEndDate = undefined;
+    } else if (preset === "Custom Range") {
+      exportFilters.datePreset = "Custom";
+      exportFilters.customStartDate = startDate;
+      exportFilters.customEndDate = endDate;
+    } else {
+      // Must map correctly if it's identical strings
+      exportFilters.datePreset = preset;
+      exportFilters.customStartDate = undefined;
+      exportFilters.customEndDate = undefined;
+    }
 
-    XLSX.writeFile(workbook, `audit_logs_${new Date().toISOString().split('T')[0]}.${format}`)
+    try {
+      const result = await fetchAuditLogs(exportFilters)
+      if (result.success && result.data) {
+        if (exportFormat === "xlsx") {
+          await exportAuditToExcel(result.data.logs, exportFilters, new Date(), userOptions);
+        } else {
+          exportAuditToCSV(result.data.logs);
+        }
+      } else {
+        // Handle error visually if necessary
+        console.error("Export failed", result.error);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsExporting(false)
+      setIsExportModalOpen(false)
+    }
   }
 
   return (
@@ -166,11 +202,11 @@ export default function AuditPage() {
               Refresh Logs
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" className="bg-background" onClick={() => handleExport("csv")} disabled={logs.length === 0}>
+              <Button variant="outline" className="bg-background" onClick={() => handleExportClick("csv")} disabled={logs.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 CSV
               </Button>
-              <Button onClick={() => handleExport("xlsx")} disabled={logs.length === 0}>
+              <Button onClick={() => handleExportClick("xlsx")} disabled={logs.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 Excel
               </Button>
@@ -203,6 +239,7 @@ export default function AuditPage() {
                 <SelectItem value="Yesterday">Yesterday</SelectItem>
                 <SelectItem value="Last 7 Days">Last 7 Days</SelectItem>
                 <SelectItem value="Last 30 Days">Last 30 Days</SelectItem>
+                <SelectItem value="Last 90 Days">Last 90 Days</SelectItem>
                 <SelectItem value="This Month">This Month</SelectItem>
                 <SelectItem value="Custom">Custom Range</SelectItem>
               </SelectContent>
@@ -231,42 +268,42 @@ export default function AuditPage() {
               <Filter className="h-3 w-3" /> Filters:
             </div>
 
-            <Select value={userFilter} onValueChange={(val) => setUserFilter(val ?? 'All')}>
+            <Select value={userFilter} onValueChange={(val) => setUserFilter(val ?? 'All Users')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="User" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All Users</SelectItem>
+                <SelectItem value="All Users">All Users</SelectItem>
                 {userOptions.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>
 
-            <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val ?? 'All')}>
+            <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val ?? 'All Categories')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All Categories</SelectItem>
+                <SelectItem value="All Categories">All Categories</SelectItem>
                 {AUDIT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
 
-            <Select value={actionFilter} onValueChange={(val) => setActionFilter(val ?? 'All')}>
+            <Select value={actionFilter} onValueChange={(val) => setActionFilter(val ?? 'All Actions')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Action Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All Actions</SelectItem>
+                <SelectItem value="All Actions">All Actions</SelectItem>
                 {AUDIT_ACTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
               </SelectContent>
             </Select>
 
-            <Select value={severityFilter} onValueChange={(val) => setSeverityFilter(val ?? 'All')}>
+            <Select value={severityFilter} onValueChange={(val) => setSeverityFilter(val ?? 'All Severities')}>
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All Severities</SelectItem>
+                <SelectItem value="All Severities">All Severities</SelectItem>
                 {AUDIT_SEVERITIES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -326,6 +363,13 @@ export default function AuditPage() {
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
         log={selectedLog}
+      />
+
+      <ExportModal 
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={handleExportExecute}
+        isLoading={isExporting}
       />
     </div>
   )
