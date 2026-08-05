@@ -104,6 +104,17 @@ export default function InventoryPage() {
 
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
+  // Parse URL query parameter for low-stock filter on mount
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("filter") === "low-stock") {
+        setShowLowStockOnly(true);
+      }
+    }
+  }, []);
+
   // Fetch inventory items, categories, and units from Supabase
   useEffect(() => {
     const supabase = createClient();
@@ -211,9 +222,16 @@ export default function InventoryPage() {
         item.unit.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory =
         categoryFilter === "all" || item.categoryId === categoryFilter;
-      return matchesSearch && matchesCategory;
+        
+      let matchesLowStock = true;
+      if (showLowStockOnly) {
+        const s = getInventoryStatus(item);
+        matchesLowStock = s === "Low Stock" || s === "Critical Stock" || s === "Out of Stock";
+      }
+      
+      return matchesSearch && matchesCategory && matchesLowStock;
     });
-  }, [items, searchQuery, categoryFilter]);
+  }, [items, searchQuery, categoryFilter, showLowStockOnly]);
 
   // Quick stats
   const totalItems = items.length;
@@ -834,11 +852,14 @@ export default function InventoryPage() {
                 </div>
               </div>
               <div className="h-8 w-px bg-border" />
-              <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+                className={`flex items-center gap-2 p-1.5 -m-1.5 rounded-lg transition-colors cursor-pointer ${showLowStockOnly ? "bg-amber-100/50 dark:bg-amber-900/20 ring-1 ring-amber-200 dark:ring-amber-800" : "hover:bg-muted/50"}`}
+              >
                 <div className="bg-amber-500/10 p-1.5 rounded-md">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                 </div>
-                <div>
+                <div className="text-left">
                   <p className="text-2xl font-bold tracking-tight leading-none">
                     {lowStockCount}
                   </p>
@@ -846,7 +867,7 @@ export default function InventoryPage() {
                     Low / Critical
                   </p>
                 </div>
-              </div>
+              </button>
               <div className="h-8 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <div className="bg-[#e08a4f]/10 p-1.5 rounded-md">

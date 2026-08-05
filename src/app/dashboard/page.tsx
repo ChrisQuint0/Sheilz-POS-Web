@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import {
 import { Line } from "react-chartjs-2";
 import { createClient } from "@/app/lib/supabase/client";
 import { useProfile } from "@/components/profile-provider";
+import { generateDashboardPDF } from "@/lib/pdf-export";
 
 ChartJS.register(
   CategoryScale,
@@ -214,6 +215,7 @@ export default function Dashboard() {
   const [exporting, setExporting] = useState(false);
   const [dayOffset, setDayOffset] = useState(0);
   const [trendLoading, setTrendLoading] = useState(false);
+  const chartRef = useRef<any>(null);
 
   // Fetch data for a given day offset
   const fetchOffsetData = useCallback(async (offset: number) => {
@@ -434,25 +436,44 @@ export default function Dashboard() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
-      const res = await fetch(
-        `/api/export-sales?startDate=${today}&endDate=${today}&preset=Today`,
-      );
-      if (!res.ok) {
-        // If no data found or error, show alert
-        const msg = await res.json().catch(() => ({}));
-        toast.error(msg.message || msg.error || "Export failed");
-        return;
+      let chartImageBase64 = null;
+      if (chartRef.current) {
+        chartImageBase64 = chartRef.current.toBase64Image();
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Dashboard_Export_${today}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+
+      let logoImageBase64 = null;
+      try {
+        const response = await fetch('/sheilz_pos_logo.png');
+        if (response.ok) {
+          const blob = await response.blob();
+          logoImageBase64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load logo", e);
+      }
+
+      generateDashboardPDF({
+        kpis: {
+          today_revenue: kpis?.today_revenue ?? 0,
+          today_orders: kpis?.today_orders ?? 0,
+          today_avg_order: kpis?.today_avg_order ?? 0,
+        },
+        stockAlertCount,
+        revenueTrend,
+        lowStockItems,
+        recentActivity,
+        dayOffset,
+        chartImageBase64,
+        logoImageBase64,
+        profileName: profile?.display_name || "Administrator",
+      });
+      
+      toast.success("Dashboard report generated successfully!");
     } catch (err) {
       console.error("Export error:", err);
       toast.error("Export failed. Please try again.");
@@ -499,6 +520,7 @@ export default function Dashboard() {
           </Button>
           <Button
             variant="outline"
+            size="sm"
             className="bg-background"
             onClick={handleExport}
             disabled={exporting}
@@ -674,7 +696,7 @@ export default function Dashboard() {
                   {stockAlertCount}
                 </div>
                 <Link
-                  href="/inventory"
+                  href="/inventory?filter=low-stock"
                   onClick={(e) => handleRestrictedLinkClick(e, "/inventory")}
                   className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 underline underline-offset-2 bg-transparent border-none p-0 cursor-pointer"
                 >
@@ -750,7 +772,7 @@ export default function Dashboard() {
               </div>
             ) : revenueTrend.length > 0 ? (
               <div className="relative h-full w-full transition-opacity duration-200" style={{ opacity: trendLoading ? 0.7 : 1 }}>
-                <Line data={chartData} options={chartOptions as any} />
+                <Line ref={chartRef} data={chartData} options={chartOptions as any} />
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
@@ -762,6 +784,76 @@ export default function Dashboard() {
 
         {/* Right column */}
         <div className="flex flex-col gap-4">
+          {/* Low Stock Items */}
+          <Card id="low-stock" className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                Low Stock
+              </CardTitle>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-xs text-primary p-0 h-auto"
+                nativeButton={false}
+                render={<Link href="/inventory?filter=low-stock" onClick={(e) => handleRestrictedLinkClick(e, "/inventory")} />}
+              >
+                Manage →
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                      <Skeleton className="h-2 w-full rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : lowStockItems.length > 0 ? (
+                <div className="space-y-4">
+                  {lowStockItems.map((item) => {
+                    const severity = stockSeverity(
+                      item.current_stock,
+                      item.low_stock_threshold,
+                    );
+                    const pct = Math.round(
+                      (item.current_stock / item.low_stock_threshold) * 100,
+                    );
+
+                    return (
+                      <div key={item.item_id}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium">{item.item_name}</p>
+                          <span className="text-sm font-bold tabular-nums">
+                            {item.current_stock}
+                            <span className="text-xs font-normal text-muted-foreground">
+                              /{item.low_stock_threshold} {item.unit}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${severityBar[severity]}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  All items are well-stocked! 🎉
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Recent Activity */}
           <Card className="shadow-sm flex-1">
             <CardHeader className="pb-3">
@@ -826,6 +918,7 @@ export default function Dashboard() {
               <div className="mt-5 pt-4 border-t border-border">
                 <Button
                   variant="link"
+                  size="sm"
                   className="text-sm text-primary hover:text-primary/80 p-0 h-auto w-full justify-center"
                   nativeButton={false}
                   render={<Link href="/audit" onClick={(e) => handleRestrictedLinkClick(e, "/audit")} />}
@@ -833,75 +926,6 @@ export default function Dashboard() {
                   View all activity
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Low Stock Items */}
-          <Card id="low-stock" className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                Low Stock
-              </CardTitle>
-              <Button
-                variant="link"
-                className="text-xs text-primary p-0 h-auto"
-                nativeButton={false}
-                render={<Link href="/inventory" onClick={(e) => handleRestrictedLinkClick(e, "/inventory")} />}
-              >
-                Manage →
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i}>
-                      <div className="flex items-center justify-between mb-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-4 w-12" />
-                      </div>
-                      <Skeleton className="h-2 w-full rounded-full" />
-                    </div>
-                  ))}
-                </div>
-              ) : lowStockItems.length > 0 ? (
-                <div className="space-y-4">
-                  {lowStockItems.map((item) => {
-                    const severity = stockSeverity(
-                      item.current_stock,
-                      item.low_stock_threshold,
-                    );
-                    const pct = Math.round(
-                      (item.current_stock / item.low_stock_threshold) * 100,
-                    );
-
-                    return (
-                      <div key={item.item_id}>
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-medium">{item.item_name}</p>
-                          <span className="text-sm font-bold tabular-nums">
-                            {item.current_stock}
-                            <span className="text-xs font-normal text-muted-foreground">
-                              /{item.low_stock_threshold} {item.unit}
-                            </span>
-                          </span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${severityBar[severity]}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  All items are well-stocked! 🎉
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>
