@@ -617,37 +617,44 @@ export default function SalesHistoryPage() {
     <>
       <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto h-full space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Sales History</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              View, search, manage, and export transaction records from the POS
-              system.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {selectedRows.length > 0 && isDesktop && isAdmin && (
-              <Button
-                variant="destructive"
-                onClick={() => requestDelete(selectedRows)}
-                className="animate-in fade-in"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected ({selectedRows.length})
+        <div className="flex flex-col gap-6 mb-2">
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b border-[#C2456A]/10">
+            <div>
+              <p className="text-xs font-medium text-[#C2456A] uppercase tracking-widest mb-1">
+                Transaction Records
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                Sales History
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                View, search, manage, and export transaction records from the POS
+                system.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {selectedRows.length > 0 && isDesktop && isAdmin && (
+                <Button
+                  variant="destructive"
+                  onClick={() => requestDelete(selectedRows)}
+                  className="animate-in fade-in"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Selected ({selectedRows.length})
+                </Button>
+              )}
+              <Button variant="outline" className="bg-background" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Excel
               </Button>
-            )}
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Excel
-            </Button>
-            <Button variant="outline" onClick={() => setIsMassUploadOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Mass Upload
-            </Button>
-            <Button onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
+              <Button variant="outline" className="bg-background" onClick={() => setIsMassUploadOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Mass Upload
+              </Button>
+              <Button onClick={() => setIsAddModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Transaction
+              </Button>
+            </div>
           </div>
         </div>
 
