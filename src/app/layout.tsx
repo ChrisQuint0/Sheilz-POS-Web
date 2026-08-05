@@ -12,7 +12,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SHEILZ COFFEE",
+  title: "Sheilz Coffee",
   description: "Sheilz Coffee Point of Sale System",
 };
 

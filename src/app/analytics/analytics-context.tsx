@@ -146,9 +146,9 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     return {
       dateFrom: formatDate(past),
       dateTo: formatDate(today),
-      category: "all",
-      paymentMethod: "all",
-      cashier: "all",
+      category: "All",
+      paymentMethod: "All",
+      cashier: "All",
     };
   });
   const [data, setData] = useState<AnalyticsData>(emptyData);
@@ -199,9 +199,9 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       const filterParams = {
         p_date_from: dateFrom,
         p_date_to: dateTo,
-        p_category: filters.category,
-        p_payment_method: filters.paymentMethod,
-        p_cashier: filters.cashier,
+        p_category: filters.category === "All" ? "all" : filters.category,
+        p_payment_method: filters.paymentMethod === "All" ? "all" : filters.paymentMethod,
+        p_cashier: filters.cashier === "All" ? "all" : filters.cashier,
       };
 
       const [

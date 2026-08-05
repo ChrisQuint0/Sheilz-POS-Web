@@ -97,13 +97,13 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</label>
           <Select
             value={filters.category}
-            onValueChange={(val) => setFilters((prev) => ({ ...prev, category: val ?? "all" }))}
+            onValueChange={(val) => setFilters((prev) => ({ ...prev, category: val ?? "All" }))}
           >
             <SelectTrigger className="shadow-sm">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="All">All Categories</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat} value={cat}>
                   {cat}
@@ -117,13 +117,13 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Method</label>
           <Select
             value={filters.paymentMethod}
-            onValueChange={(val) => setFilters((prev) => ({ ...prev, paymentMethod: val ?? "all" }))}
+            onValueChange={(val) => setFilters((prev) => ({ ...prev, paymentMethod: val ?? "All" }))}
           >
             <SelectTrigger className="shadow-sm">
               <SelectValue placeholder="Select payment" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Methods</SelectItem>
+              <SelectItem value="All">All Methods</SelectItem>
               {paymentMethods.map((pm) => (
                 <SelectItem key={pm} value={pm}>
                   {pm}
@@ -137,13 +137,13 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cashier</label>
           <Select
             value={filters.cashier}
-            onValueChange={(val) => setFilters((prev) => ({ ...prev, cashier: val ?? "all" }))}
+            onValueChange={(val) => setFilters((prev) => ({ ...prev, cashier: val ?? "All" }))}
           >
             <SelectTrigger className="shadow-sm">
               <SelectValue placeholder="Select cashier" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Cashiers</SelectItem>
+              <SelectItem value="All">All Cashiers</SelectItem>
               {cashiers.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
