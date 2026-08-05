@@ -13,16 +13,16 @@ import { OperationalInsights } from "./components/operational-insights";
 import { exportToExcel, exportChartsToPDF } from "./utils/export-utils";
 
 function AnalyticsDashboard() {
-  const { data, refresh } = useAnalytics();
+  const { data, filters, refresh } = useAnalytics();
 
   const handleExportExcel = async () => {
-    exportToExcel(data);
+    exportToExcel(data, filters);
     const { logAppEvent } = await import('@/app/audit/actions');
-    logAppEvent("Report Exported", "Low", "Report", "Sheilz_Analytics_Report.xlsx", null).catch(console.error);
+    logAppEvent("Report Exported", "Low", "Report", "Analytics_Report.xlsx", null).catch(console.error);
   };
 
   const handleExportCharts = async () => {
-    await exportChartsToPDF();
+    await exportChartsToPDF(data, filters);
     const { logAppEvent } = await import('@/app/audit/actions');
     logAppEvent("Report Exported", "Low", "Report", "Sheilz_Analytics_Charts.pdf", null).catch(console.error);
   };

@@ -28,6 +28,25 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
     cashiers,
   } = useAnalytics();
 
+  const setDatePreset = (days: number) => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - days);
+
+    const formatDate = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    setFilters((prev) => ({
+      ...prev,
+      dateFrom: formatDate(start),
+      dateTo: formatDate(today),
+    }));
+  };
+
   return (
     <div className="flex flex-col gap-5 mb-8">
       {/* Header — matches dashboard style */}
@@ -66,29 +85,36 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
             <CalendarDays className="h-3.5 w-3.5" />
             Date Range
           </label>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">From</span>
-              <Input
-                type="date"
-                className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))
-                }
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">From</span>
+                <Input
+                  type="date"
+                  className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm"
+                  value={filters.dateFrom}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))
+                  }
+                />
+              </div>
+              <span className="text-muted-foreground/40">—</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">To</span>
+                <Input
+                  type="date"
+                  className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm"
+                  value={filters.dateTo}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, dateTo: e.target.value }))
+                  }
+                />
+              </div>
             </div>
-            <span className="text-muted-foreground/40">—</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">To</span>
-              <Input
-                type="date"
-                className="h-9 w-[140px] px-2.5 py-1 text-sm shadow-sm"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, dateTo: e.target.value }))
-                }
-              />
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <Button type="button" variant="secondary" size="sm" className="h-6 px-2.5 text-[11px] rounded bg-muted/60 hover:bg-muted font-medium text-muted-foreground transition-colors" onClick={() => setDatePreset(7)}>Last 7 Days</Button>
+              <Button type="button" variant="secondary" size="sm" className="h-6 px-2.5 text-[11px] rounded bg-muted/60 hover:bg-muted font-medium text-muted-foreground transition-colors" onClick={() => setDatePreset(30)}>Last 30 Days</Button>
+              <Button type="button" variant="secondary" size="sm" className="h-6 px-2.5 text-[11px] rounded bg-muted/60 hover:bg-muted font-medium text-muted-foreground transition-colors" onClick={() => setDatePreset(90)}>Last 90 Days</Button>
             </div>
           </div>
         </div>

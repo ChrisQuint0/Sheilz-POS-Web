@@ -134,7 +134,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<AnalyticsFilters>(() => {
     const today = new Date();
     const past = new Date(today);
-    past.setMonth(today.getMonth() - 3);
+    past.setMonth(today.getMonth() - 1);
 
     const formatDate = (date: Date) => {
       const y = date.getFullYear();

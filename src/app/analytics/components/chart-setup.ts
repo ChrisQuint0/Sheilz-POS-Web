@@ -41,7 +41,8 @@ export const defaultChartOptions = {
       labels: {
         color: "#826f69",
         usePointStyle: true,
-        pointStyleWidth: 8,
+        boxWidth: 8,
+        boxHeight: 8,
         padding: 16,
         font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
       },
@@ -56,6 +57,8 @@ export const defaultChartOptions = {
       cornerRadius: 8,
       boxPadding: 6,
       usePointStyle: true,
+      boxWidth: 8,
+      boxHeight: 8,
       titleFont: { size: 12, weight: "bold" as const, family: "'Plus Jakarta Sans', sans-serif" },
       bodyFont: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
     },

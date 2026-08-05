@@ -1,204 +1,794 @@
-import * as XLSX from "xlsx";
+import * as ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
-import { AnalyticsData } from "../analytics-context";
+import autoTable from "jspdf-autotable";
+import { AnalyticsData, AnalyticsFilters } from "../analytics-context";
 
-export const exportToExcel = (data: AnalyticsData) => {
-  // Create a new workbook
-  const wb = XLSX.utils.book_new();
-
-  // ── Sheet 1: KPI Data (Net Revenue removed) ──
-  const kpiData = [
-    { Metric: "Total Revenue", Value: data.kpis?.total_revenue || 0 },
-    { Metric: "Total Orders", Value: data.kpis?.total_orders || 0 },
-    { Metric: "Average Order Value", Value: data.kpis?.avg_order_value || 0 },
-    { Metric: "Inventory Expenses", Value: data.kpis?.inventory_expenses || 0 },
-  ];
-  const kpiSheet = XLSX.utils.json_to_sheet(kpiData);
-  XLSX.utils.book_append_sheet(wb, kpiSheet, "KPIs");
-
-  // ── Sheet 2: Revenue by Period ──
-  if (data.revenue.length > 0) {
-    const revenueRows = data.revenue.map(r => ({
-      Period: r.period_label,
-      "Total Sales": r.total_sales,
-    }));
-    const revenueSheet = XLSX.utils.json_to_sheet(revenueRows);
-    XLSX.utils.book_append_sheet(wb, revenueSheet, "Revenue");
+// Helper for dynamic file name
+const generateFileName = (filters: AnalyticsFilters) => {
+  const { dateFrom, dateTo } = filters;
+  let datePart = "";
+  if (dateFrom && dateTo) {
+    if (dateFrom === dateTo) {
+      datePart = dateFrom;
+    } else {
+      datePart = `${dateFrom}_to_${dateTo}`;
+    }
+  } else {
+    datePart = "All_Time";
   }
-
-  // ── Sheet 3: Top Products ──
-  if (data.topProducts.length > 0) {
-    const productRows = data.topProducts.map(p => ({
-      "Product Name": p.product_name,
-      "Qty Sold": p.qty_sold,
-      Revenue: p.revenue,
-    }));
-    const productsSheet = XLSX.utils.json_to_sheet(productRows);
-    XLSX.utils.book_append_sheet(wb, productsSheet, "Top Products");
-  }
-
-  // ── Sheet 4: Category Revenue ──
-  if (data.categoryRevenue.length > 0) {
-    const categoryRows = data.categoryRevenue.map(c => ({
-      Category: c.category_name,
-      Revenue: c.revenue,
-    }));
-    const categorySheet = XLSX.utils.json_to_sheet(categoryRows);
-    XLSX.utils.book_append_sheet(wb, categorySheet, "Categories");
-  }
-
-  // ── Sheet 5: Peak Hours ──
-  if (data.peakHours.length > 0) {
-    const peakHourRows = data.peakHours.map(h => ({
-      Hour: h.hour_label,
-      "Order Count": h.order_count,
-    }));
-    const peakHoursSheet = XLSX.utils.json_to_sheet(peakHourRows);
-    XLSX.utils.book_append_sheet(wb, peakHoursSheet, "Peak Hours");
-  }
-
-  // ── Sheet 6: Peak Days ──
-  if (data.peakDays.length > 0) {
-    const peakDayRows = data.peakDays.map(d => ({
-      Day: d.day_label,
-      "Total Sales": d.total_sales,
-    }));
-    const peakDaysSheet = XLSX.utils.json_to_sheet(peakDayRows);
-    XLSX.utils.book_append_sheet(wb, peakDaysSheet, "Peak Days");
-  }
-
-  // ── Sheet 7: Payment Distribution ──
-  if (data.paymentDistribution.length > 0) {
-    const paymentRows = data.paymentDistribution.map(p => ({
-      "Payment Method": p.method,
-      Revenue: p.revenue,
-      "Percentage (%)": p.percentage,
-    }));
-    const paymentSheet = XLSX.utils.json_to_sheet(paymentRows);
-    XLSX.utils.book_append_sheet(wb, paymentSheet, "Payment Distribution");
-  }
-
-  // ── Sheet 8: Transaction Status ──
-  if (data.transactionStatus.length > 0) {
-    const statusRows = data.transactionStatus.map(s => ({
-      Status: s.status,
-      "Order Count": s.order_count,
-      "Percentage (%)": s.percentage,
-    }));
-    const statusSheet = XLSX.utils.json_to_sheet(statusRows);
-    XLSX.utils.book_append_sheet(wb, statusSheet, "Transaction Status");
-  }
-
-  // ── Sheet 9: Void Analysis ──
-  if (data.voidAnalysis) {
-    const voidData = [
-      { Metric: "Total Voids", Value: data.voidAnalysis.total_voids },
-      { Metric: "Revenue Lost", Value: data.voidAnalysis.revenue_lost },
-      { Metric: "Void Rate (%)", Value: data.voidAnalysis.void_rate },
-      { Metric: "Total Orders", Value: data.voidAnalysis.total_orders },
-    ];
-    const voidSheet = XLSX.utils.json_to_sheet(voidData);
-    XLSX.utils.book_append_sheet(wb, voidSheet, "Void Analysis");
-  }
-
-  // ── Sheet 10: Most Consumed Ingredients ──
-  if (data.mostConsumed.length > 0) {
-    const mostRows = data.mostConsumed.map(i => ({
-      "Item Name": i.item_name,
-      Unit: i.unit,
-      "Total Consumed": i.total_consumed,
-    }));
-    const mostSheet = XLSX.utils.json_to_sheet(mostRows);
-    XLSX.utils.book_append_sheet(wb, mostSheet, "Most Consumed");
-  }
-
-  // ── Sheet 11: Least Consumed Ingredients ──
-  if (data.leastConsumed.length > 0) {
-    const leastRows = data.leastConsumed.map(i => ({
-      "Item Name": i.item_name,
-      Unit: i.unit,
-      "Total Consumed": i.total_consumed,
-    }));
-    const leastSheet = XLSX.utils.json_to_sheet(leastRows);
-    XLSX.utils.book_append_sheet(wb, leastSheet, "Least Consumed");
-  }
-
-  // Save the file
-  XLSX.writeFile(wb, "Sheilz_Analytics_Report.xlsx");
+  return `Analytics_Report_${datePart}.xlsx`;
 };
 
-export const exportChartsToPDF = async () => {
-  const analyticsContainer = document.getElementById("analytics-dashboard-content");
-  if (!analyticsContainer) return;
+export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilters) => {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Sheilz Coffee";
+  wb.lastModifiedBy = "Sheilz POS System";
+  wb.created = new Date();
 
-  try {
-    // Grab all chart canvas elements rendered by Chart.js
-    const canvasElements = analyticsContainer.querySelectorAll("canvas");
+  // Common Theme Styles
+  const primaryColor = "C2456A";
+  const headerBg = "F5E9EC"; 
+  const textColor = "3A2B27";
 
-    if (canvasElements.length === 0) {
-      alert("No charts found to export.");
-      return;
+  const headerStyle = {
+    font: { bold: true, color: { argb: primaryColor }, size: 12 },
+    fill: { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } } as ExcelJS.Fill,
+    border: {
+      bottom: { style: "medium", color: { argb: primaryColor } }
+    } as ExcelJS.Borders
+  };
+
+  const currencyFormat = '"₱"#,##0.00';
+  const numberFormat = '#,##0';
+  const percentFormat = '0.00%';
+
+  const isDataEmpty = 
+    data.revenue.length === 0 && 
+    data.topProducts.length === 0 && 
+    data.categoryRevenue.length === 0;
+
+  // 1. Executive Summary
+  const summarySheet = wb.addWorksheet("Executive Summary");
+  summarySheet.getColumn(1).width = 25;
+  summarySheet.getColumn(2).width = 30;
+
+  // Title
+  summarySheet.mergeCells("A1:B1");
+  const titleCell = summarySheet.getCell("A1");
+  titleCell.value = "Sheilz Coffee";
+  titleCell.font = { size: 18, bold: true, color: { argb: primaryColor } };
+  
+  summarySheet.mergeCells("A2:B2");
+  summarySheet.getCell("A2").value = "Sales Analytics Report";
+  summarySheet.getCell("A2").font = { size: 14, bold: true, color: { argb: textColor } };
+
+  summarySheet.getCell("A4").value = "Reporting Period";
+  summarySheet.getCell("B4").value = filters.dateFrom && filters.dateTo 
+    ? (filters.dateFrom === filters.dateTo ? filters.dateFrom : `${filters.dateFrom} to ${filters.dateTo}`)
+    : "All Time";
+  
+  summarySheet.getCell("A5").value = "Generated On";
+  summarySheet.getCell("B5").value = new Date().toLocaleString("en-PH");
+
+  summarySheet.getCell("A6").value = "Generated By";
+  summarySheet.getCell("B6").value = "System Administrator"; 
+
+  summarySheet.getCell("A7").value = "Branch";
+  summarySheet.getCell("B7").value = "Main Branch";
+  
+  ["A4","A5","A6","A7"].forEach(c => {
+    summarySheet.getCell(c).font = { bold: true, color: { argb: textColor } };
+  });
+
+  if (isDataEmpty) {
+    summarySheet.mergeCells("A9:B9");
+    const emptyCell = summarySheet.getCell("A9");
+    emptyCell.value = "No analytics data is available for the selected reporting period and filters.";
+    emptyCell.font = { italic: true, color: { argb: "FF0000" } };
+  } else {
+    // KPI Summary
+    summarySheet.getCell("A9").value = "KPI Summary";
+    summarySheet.getCell("A9").font = { size: 12, bold: true, color: { argb: primaryColor } };
+    
+    summarySheet.getCell("A10").value = "Total Revenue";
+    summarySheet.getCell("B10").value = data.kpis?.total_revenue || 0;
+    summarySheet.getCell("B10").numFmt = currencyFormat;
+
+    summarySheet.getCell("A11").value = "Total Orders";
+    summarySheet.getCell("B11").value = data.kpis?.total_orders || 0;
+    summarySheet.getCell("B11").numFmt = numberFormat;
+
+    summarySheet.getCell("A12").value = "Average Order Value";
+    summarySheet.getCell("B12").value = data.kpis?.avg_order_value || 0;
+    summarySheet.getCell("B12").numFmt = currencyFormat;
+
+    summarySheet.getCell("A13").value = "Inventory Delivery Expenses";
+    summarySheet.getCell("B13").value = data.kpis?.inventory_expenses || 0;
+    summarySheet.getCell("B13").numFmt = currencyFormat;
+
+    // Applied Filters
+    summarySheet.getCell("A15").value = "Applied Filters";
+    summarySheet.getCell("A15").font = { size: 12, bold: true, color: { argb: primaryColor } };
+    
+    const filterData = [
+      ["Date Range", filters.dateFrom && filters.dateTo ? `${filters.dateFrom} to ${filters.dateTo}` : "All Time"],
+      ["Category", filters.category],
+      ["Payment Method", filters.paymentMethod],
+      ["Cashier", filters.cashier],
+    ];
+
+    let row = 16;
+    filterData.forEach(([f, v]) => {
+      summarySheet.getCell(`A${row}`).value = f;
+      summarySheet.getCell(`A${row}`).font = { bold: true };
+      summarySheet.getCell(`B${row}`).value = v;
+      row++;
+    });
+
+    // 2. Sales Overview
+    if (data.revenue.length > 0) {
+      const s = wb.addWorksheet("Sales Overview");
+      s.columns = [
+        { header: "Date", key: "date", width: 25 },
+        { header: "Revenue", key: "revenue", width: 20 },
+      ];
+      
+      data.revenue.forEach(r => s.addRow({ date: r.period_label, revenue: r.total_sales }));
+      
+      const lastRow = s.rowCount;
+      s.addRow({ date: "Total", revenue: { formula: `SUM(B2:B${lastRow})` } });
+      const avgRow = s.rowCount + 1;
+      s.addRow({ date: "Average Daily Revenue", revenue: { formula: `AVERAGE(B2:B${lastRow})` } });
+      const maxRow = s.rowCount + 1;
+      s.addRow({ date: "Highest Revenue", revenue: { formula: `MAX(B2:B${lastRow})` } });
+      const minRow = s.rowCount + 1;
+      s.addRow({ date: "Lowest Revenue", revenue: { formula: `MIN(B2:B${lastRow})` } });
+
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      
+      s.getColumn(2).numFmt = currencyFormat;
+      [lastRow + 1, avgRow, maxRow, minRow].forEach(r => s.getRow(r).font = { bold: true });
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:B1';
+      
+      s.addConditionalFormatting({
+        ref: `B2:B${lastRow}`,
+        rules: [{
+          priority: 1,
+          type: 'colorScale',
+          cfvo: [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }],
+          color: [{ argb: 'FFF8696B' }, { argb: 'FFFFEB84' }, { argb: 'FF63BE7B' }]
+        }]
+      });
     }
 
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentWidth = pageWidth - margin * 2;
+    // 3. Revenue by Category
+    if (data.categoryRevenue.length > 0) {
+      const s = wb.addWorksheet("Revenue by Category");
+      s.columns = [
+        { header: "Category", key: "cat", width: 30 },
+        { header: "Revenue", key: "rev", width: 20 },
+        { header: "Percentage", key: "perc", width: 15 },
+      ];
+      
+      const totalRev = data.categoryRevenue.reduce((sum, item) => sum + item.revenue, 0);
+      let sorted = [...data.categoryRevenue].sort((a,b) => b.revenue - a.revenue);
+      
+      sorted.forEach(c => s.addRow({ 
+        cat: c.category_name, 
+        rev: c.revenue, 
+        perc: totalRev > 0 ? (c.revenue / totalRev) : 0 
+      }));
+      
+      const last = s.rowCount;
+      s.addRow({ cat: "Total", rev: { formula: `SUM(B2:B${last})` }, perc: 1 });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = currencyFormat;
+      s.getColumn(3).numFmt = percentFormat;
+      s.getRow(last + 1).font = { bold: true };
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:C1';
+    }
 
-    // Title page header
-    pdf.setFontSize(20);
-    pdf.setTextColor(194, 69, 106); // Brand color #C2456A
-    pdf.text("Sheilz Analytics Report", margin, 25);
-    pdf.setFontSize(10);
-    pdf.setTextColor(130, 111, 105); // Muted color #826f69
-    pdf.text(`Generated on ${new Date().toLocaleDateString("en-PH", { 
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
-      hour: "2-digit", minute: "2-digit"
-    })}`, margin, 33);
+    // 4. Best-Selling Products
+    if (data.topProducts.length > 0) {
+      const s = wb.addWorksheet("Best-Selling Products");
+      s.columns = [
+        { header: "Product", key: "prod", width: 40 },
+        { header: "Quantity Sold", key: "qty", width: 20 },
+        { header: "Revenue", key: "rev", width: 20 },
+      ];
+      
+      data.topProducts.forEach((p, idx) => {
+        const row = s.addRow({ prod: p.product_name, qty: p.qty_sold, rev: p.revenue });
+        if (idx < 10) {
+          row.font = { bold: true };
+        }
+      });
+      
+      const last = s.rowCount;
+      s.addRow({ prod: "Total", qty: { formula: `SUM(B2:B${last})` }, rev: { formula: `SUM(C2:C${last})` } });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = numberFormat;
+      s.getColumn(3).numFmt = currencyFormat;
+      s.getRow(last + 1).font = { bold: true };
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:C1';
+    }
 
-    let yOffset = 45;
+    // 5. Peak Sales Hours
+    if (data.peakHours.length > 0) {
+      const s = wb.addWorksheet("Peak Sales Hours");
+      s.columns = [
+        { header: "Hour", key: "hr", width: 20 },
+        { header: "Orders", key: "ord", width: 20 },
+      ];
+      
+      data.peakHours.forEach(h => s.addRow({ hr: h.hour_label, ord: h.order_count }));
+      const last = s.rowCount;
+      
+      s.addRow({ hr: "Total Orders", ord: { formula: `SUM(B2:B${last})` } });
+      s.addRow({ hr: "Peak Sales Hour (Max Orders)", ord: { formula: `MAX(B2:B${last})` } });
+      s.addRow({ hr: "Lowest Sales Hour (Min Orders)", ord: { formula: `MIN(B2:B${last})` } });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = numberFormat;
+      [last+1, last+2, last+3].forEach(r => s.getRow(r).font = { bold: true });
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:B1';
+    }
 
-    canvasElements.forEach((canvas) => {
-      // Get the chart image directly from the canvas (bypasses html2canvas entirely)
-      const imgData = canvas.toDataURL("image/png", 1.0);
+    // 6. Peak Sales Days
+    if (data.peakDays.length > 0) {
+      const s = wb.addWorksheet("Peak Sales Days");
+      s.columns = [
+        { header: "Day", key: "day", width: 20 },
+        { header: "Revenue", key: "rev", width: 20 },
+      ];
+      
+      data.peakDays.forEach(d => s.addRow({ day: d.day_label, rev: d.total_sales }));
+      const last = s.rowCount;
+      
+      s.addRow({ day: "Total Revenue", rev: { formula: `SUM(B2:B${last})` } });
+      s.addRow({ day: "Highest Performing Day", rev: { formula: `MAX(B2:B${last})` } });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = currencyFormat;
+      [last+1, last+2].forEach(r => s.getRow(r).font = { bold: true });
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:B1';
+    }
 
-      // Extract chart title from the closest Card component
-      const card = canvas.closest('.shadow-sm');
-      let chartTitle = "Analytics Chart";
-      if (card) {
-        const titleEl = card.querySelector('.font-semibold');
-        if (titleEl && titleEl.textContent) {
-          chartTitle = titleEl.textContent.trim();
+    // 7. Payment Methods
+    if (data.paymentDistribution.length > 0) {
+      const s = wb.addWorksheet("Payment Methods");
+      s.columns = [
+        { header: "Payment Method", key: "pm", width: 25 },
+        { header: "Revenue", key: "rev", width: 20 },
+        { header: "Percentage", key: "perc", width: 15 },
+      ];
+      
+      const totalRev = data.paymentDistribution.reduce((acc, curr) => acc + curr.revenue, 0);
+      
+      data.paymentDistribution.forEach(p => s.addRow({ 
+        pm: p.method, 
+        rev: p.revenue, 
+        perc: totalRev > 0 ? (p.revenue / totalRev) : 0
+      }));
+      const last = s.rowCount;
+      
+      s.addRow({ pm: "Total", rev: { formula: `SUM(B2:B${last})` }, perc: 1 });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = currencyFormat;
+      s.getColumn(3).numFmt = percentFormat;
+      s.getRow(last + 1).font = { bold: true };
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:C1';
+    }
+
+    // 8. Transaction Status
+    if (data.transactionStatus.length > 0) {
+      const s = wb.addWorksheet("Transaction Status");
+      s.columns = [
+        { header: "Status", key: "st", width: 25 },
+        { header: "Count", key: "cnt", width: 15 },
+        { header: "Percentage", key: "perc", width: 15 },
+      ];
+      
+      const totalCount = data.transactionStatus.reduce((acc, curr) => acc + curr.order_count, 0);
+      
+      data.transactionStatus.forEach(t => s.addRow({ 
+        st: t.status, 
+        cnt: t.order_count, 
+        perc: totalCount > 0 ? (t.order_count / totalCount) : 0
+      }));
+      const last = s.rowCount;
+      
+      s.addRow({ st: "Total", cnt: { formula: `SUM(B2:B${last})` }, perc: 1 });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = numberFormat;
+      s.getColumn(3).numFmt = percentFormat;
+      s.getRow(last + 1).font = { bold: true };
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:C1';
+    }
+
+    // 9. Void Analysis
+    if (data.voidAnalysis) {
+      const s = wb.addWorksheet("Void Analysis");
+      s.columns = [
+        { header: "Metric", key: "met", width: 30 },
+        { header: "Value", key: "val", width: 20 },
+      ];
+      
+      s.addRow({ met: "Total Voids", val: data.voidAnalysis.total_voids });
+      s.addRow({ met: "Void Rate", val: data.voidAnalysis.void_rate / 100 });
+      s.addRow({ met: "Revenue Lost", val: data.voidAnalysis.revenue_lost });
+      s.addRow({ met: "Total Orders", val: data.voidAnalysis.total_orders });
+      
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      
+      s.getCell("B2").numFmt = numberFormat;
+      s.getCell("B3").numFmt = percentFormat;
+      s.getCell("B4").numFmt = currencyFormat;
+      s.getCell("B5").numFmt = numberFormat;
+
+      s.addConditionalFormatting({
+        ref: 'B3:B3',
+        rules: [{
+          priority: 2,
+          type: 'colorScale',
+          cfvo: [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }],
+          color: [{ argb: 'FF63BE7B' }, { argb: 'FFFFEB84' }, { argb: 'FFF8696B' }] // Low -> Green, High -> Red
+        }]
+      });
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+    }
+
+    // 10. Most Consumed Ingredients
+    if (data.mostConsumed.length > 0) {
+      const s = wb.addWorksheet("Most Consumed Ingredients");
+      s.columns = [
+        { header: "Ingredient", key: "ing", width: 40 },
+        { header: "Quantity Used", key: "qty", width: 20 },
+      ];
+      
+      let sorted = [...data.mostConsumed].sort((a,b) => b.total_consumed - a.total_consumed);
+      sorted.forEach(i => s.addRow({ ing: `${i.item_name} (${i.unit})`, qty: i.total_consumed }));
+      const last = s.rowCount;
+
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = numberFormat;
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:B1';
+
+      s.addConditionalFormatting({
+        ref: `B2:B${last}`,
+        rules: [{
+          priority: 3,
+          type: 'colorScale',
+          cfvo: [{ type: 'min' }, { type: 'max' }],
+          color: [{ argb: 'FFE0E0E0' }, { argb: 'FF5C5C5C' }] // Light to Darker
+        }]
+      });
+    }
+
+    // 11. Least Consumed Inventory
+    if (data.leastConsumed.length > 0) {
+      const s = wb.addWorksheet("Least Consumed Inventory");
+      s.columns = [
+        { header: "Inventory Item", key: "item", width: 40 },
+        { header: "Quantity Used", key: "qty", width: 20 },
+      ];
+      
+      let sorted = [...data.leastConsumed].sort((a,b) => a.total_consumed - b.total_consumed);
+      sorted.forEach(i => s.addRow({ item: `${i.item_name} (${i.unit})`, qty: i.total_consumed }));
+      const last = s.rowCount;
+
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+      s.getColumn(2).numFmt = numberFormat;
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      s.autoFilter = 'A1:B1';
+
+      s.addConditionalFormatting({
+        ref: `B2:B${last}`,
+        rules: [{
+          priority: 4,
+          type: 'colorScale',
+          cfvo: [{ type: 'min' }, { type: 'max' }],
+          color: [{ argb: 'FF5C5C5C' }, { argb: 'FFE0E0E0' }] // Darker to Lighter (ascending)
+        }]
+      });
+    }
+  }
+
+  // Generate File Name
+  const fileName = generateFileName(filters);
+
+  // Generate Excel file
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  saveAs(blob, fileName);
+};
+
+export const exportChartsToPDF = async (data: AnalyticsData, filters: AnalyticsFilters) => {
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 15;
+  const contentWidth = pageWidth - margin * 2;
+  const GAP = 10; // gap between columns
+
+  // Determine Title
+  const { dateFrom, dateTo } = filters;
+  let reportTitle = "Custom Analytics Report";
+  let reportingPeriod = "All Time";
+  if (!dateFrom && !dateTo) {
+    reportTitle = "All-Time Analytics Report";
+  } else if (dateFrom === dateTo) {
+    reportTitle = "Daily Analytics Report";
+    reportingPeriod = dateFrom;
+  } else if (dateFrom && dateTo) {
+    const d1 = new Date(dateFrom);
+    const d2 = new Date(dateTo);
+    const diffDays = Math.round(Math.abs((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)));
+    if (diffDays === 6 || diffDays === 7) reportTitle = "Weekly Analytics Report";
+    else if (diffDays >= 28 && diffDays <= 31) reportTitle = "Monthly Analytics Report";
+    reportingPeriod = `${dateFrom} to ${dateTo}`;
+  }
+
+  const primaryColor = [194, 69, 106];
+  const textColor = [58, 43, 39];
+  const mutedColor = [130, 111, 105];
+  const formatCurrency = (val: number) => `P${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+  const addFooter = (doc: jsPDF) => {
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(130, 111, 105);
+      const footerText = `Sheilz Coffee POS  |  ${reportTitle}  |  ${reportingPeriod}  |  Generated on ${new Date().toLocaleString("en-PH")}`;
+      doc.text(footerText, margin, pageHeight - 10);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
+    }
+  };
+
+  const isDataEmpty = data.revenue.length === 0 && data.topProducts.length === 0 && data.categoryRevenue.length === 0;
+
+  // Cover Page
+  pdf.setFontSize(28);
+  pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.text("Sheilz Coffee", margin, 60);
+  
+  pdf.setFontSize(22);
+  pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+  pdf.text(reportTitle, margin, 75);
+
+  pdf.setFontSize(12);
+  pdf.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+  pdf.text("Reporting Period: " + reportingPeriod, margin, 90);
+  pdf.text("Generated On: " + new Date().toLocaleString("en-PH"), margin, 98);
+  pdf.text("Generated By: System Administrator", margin, 106);
+  pdf.text("Branch: Main Branch", margin, 114);
+
+  if (isDataEmpty) {
+    pdf.setFontSize(14);
+    pdf.setTextColor(255, 0, 0);
+    pdf.text("No analytics data is available for the selected reporting period and filters.", margin, 140);
+    addFooter(pdf);
+    pdf.save(`Sheilz_Analytics_${reportingPeriod.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+    return;
+  }
+
+  pdf.setFontSize(11);
+  pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+  const description = `This report summarizes the operational and sales analytics for the selected reporting period based on the current dashboard filters.`;
+  pdf.text(description, margin, 130, { maxWidth: contentWidth });
+
+  // Executive Summary
+  pdf.addPage();
+  let cy = margin;
+  pdf.setFontSize(18);
+  pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.text("Executive Summary", margin, cy);
+  cy += 15;
+
+  autoTable(pdf, {
+    startY: cy,
+    head: [["Metric", "Value"]],
+    body: [
+      ["Total Revenue", formatCurrency(data.kpis?.total_revenue || 0)],
+      ["Total Orders", (data.kpis?.total_orders || 0).toLocaleString()],
+      ["Average Order Value", formatCurrency(data.kpis?.avg_order_value || 0)],
+      ["Inventory Delivery Expenses", formatCurrency(data.kpis?.inventory_expenses || 0)],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: primaryColor as [number, number, number] },
+    margin: { left: margin, right: margin }
+  });
+  cy = (pdf as any).lastAutoTable.finalY + 15;
+
+  pdf.setFontSize(14);
+  pdf.text("Dashboard Summary", margin, cy);
+  cy += 10;
+  
+  pdf.setFontSize(11);
+  pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+  const summaryText = `During the selected reporting period, the business generated ${formatCurrency(data.kpis?.total_revenue || 0)} in revenue from ${(data.kpis?.total_orders || 0).toLocaleString()} completed orders, with an average order value of ${formatCurrency(data.kpis?.avg_order_value || 0)}. Inventory delivery expenses totaled ${formatCurrency(data.kpis?.inventory_expenses || 0)}. The following pages provide a visual breakdown of operational performance.`;
+  pdf.text(summaryText, margin, cy, { maxWidth: contentWidth, lineHeightFactor: 1.5 });
+
+  cy += 20;
+
+  // -- Layout Engine --
+  const cards = document.querySelectorAll('.shadow-sm');
+  const getCanvasByTitle = (title: string): HTMLCanvasElement | null => {
+    const card = Array.from(cards).find(c => {
+      const titleEl = c.querySelector('.font-semibold');
+      return titleEl && titleEl.textContent?.includes(title);
+    });
+    return card ? card.querySelector('canvas') : null;
+  };
+
+  type GridItem = {
+    title: string;
+    subtitle?: string;
+    canvasTitle: string | null;
+    tableHead: string[];
+    tableBody: any[][];
+    maxChartHeight: number;
+  };
+
+  const items: GridItem[] = [];
+
+  if (data.revenue.length > 0) {
+    items.push({
+      title: "Sales Overview",
+      subtitle: "Revenue trends over time",
+      canvasTitle: "Sales Overview",
+      tableHead: ["Date", "Revenue"],
+      tableBody: data.revenue.map(r => [r.period_label, formatCurrency(r.total_sales)]),
+      maxChartHeight: 70
+    });
+  }
+
+  if (data.categoryRevenue.length > 0) {
+    const totalCatRev = data.categoryRevenue.reduce((s, c) => s + c.revenue, 0);
+    items.push({
+      title: "Revenue by Category",
+      subtitle: "Top revenue drivers",
+      canvasTitle: "Revenue by Category",
+      tableHead: ["Category", "Revenue", "Share"],
+      tableBody: [...data.categoryRevenue].sort((a,b)=>b.revenue-a.revenue).map(c => [c.category_name, formatCurrency(c.revenue), totalCatRev ? `${((c.revenue/totalCatRev)*100).toFixed(1)}%` : "0%"]),
+      maxChartHeight: 50
+    });
+  }
+
+  if (data.topProducts.length > 0) {
+    items.push({
+      title: "Best-Selling Products",
+      subtitle: "Top products by quantity sold",
+      canvasTitle: "Best-Selling Products",
+      tableHead: ["Product", "Qty Sold"],
+      tableBody: [...data.topProducts].sort((a,b)=>b.qty_sold-a.qty_sold).map((p, i) => [i < 10 ? `[Top ${i+1}] ${p.product_name}` : p.product_name, p.qty_sold.toString()]),
+      maxChartHeight: 50
+    });
+    
+    const totalRev = data.topProducts.reduce((s, p) => s + Number(p.revenue), 0);
+    items.push({
+      title: "Revenue Contribution",
+      subtitle: "Product share of total revenue",
+      canvasTitle: "Revenue Contribution",
+      tableHead: ["Product", "Contribution"],
+      tableBody: [...data.topProducts].sort((a,b)=>Number(b.revenue)-Number(a.revenue)).map(p => [p.product_name, totalRev ? `${((Number(p.revenue)/totalRev)*100).toFixed(1)}%` : "0%"]),
+      maxChartHeight: 45
+    });
+  }
+
+  if (data.peakHours.length > 0) {
+    const peakHour = [...data.peakHours].sort((a,b)=>b.order_count-a.order_count)[0];
+    items.push({
+      title: "Peak Sales Hours",
+      subtitle: "Hourly order volume",
+      canvasTitle: "Peak Sales Hours",
+      tableHead: ["Hour", "Orders"],
+      tableBody: data.peakHours.map(h => [h.hour_label === peakHour?.hour_label ? `* ${h.hour_label}` : h.hour_label, h.order_count.toString()]),
+      maxChartHeight: 50
+    });
+  }
+
+  if (data.peakDays.length > 0) {
+    const peakDay = [...data.peakDays].sort((a,b)=>b.total_sales-a.total_sales)[0];
+    items.push({
+      title: "Peak Sales Days",
+      subtitle: "Daily revenue performance",
+      canvasTitle: "Peak Sales Days",
+      tableHead: ["Day", "Revenue"],
+      tableBody: data.peakDays.map(d => [d.day_label === peakDay?.day_label ? `* ${d.day_label}` : d.day_label, formatCurrency(d.total_sales)]),
+      maxChartHeight: 50
+    });
+  }
+
+  if (data.paymentDistribution.length > 0) {
+    items.push({
+      title: "Payment Methods",
+      subtitle: "Revenue by payment type",
+      canvasTitle: "Payment Methods",
+      tableHead: ["Method", "Revenue", "Share"],
+      tableBody: data.paymentDistribution.map(p => [p.method, formatCurrency(p.revenue), `${p.percentage}%`]),
+      maxChartHeight: 45
+    });
+  }
+
+  if (data.transactionStatus.length > 0) {
+    items.push({
+      title: "Transaction Status",
+      subtitle: "Order completion rate",
+      canvasTitle: "Transaction Status",
+      tableHead: ["Status", "Count", "Share"],
+      tableBody: data.transactionStatus.map(s => [s.status, s.order_count.toString(), `${s.percentage}%`]),
+      maxChartHeight: 45
+    });
+  }
+
+  if (data.voidAnalysis) {
+    items.push({
+      title: "Void Analysis",
+      subtitle: "Waste and loss tracking",
+      canvasTitle: null,
+      tableHead: ["Metric", "Value"],
+      tableBody: [
+        ["Total Voids", data.voidAnalysis.total_voids.toString()],
+        ["Void Rate", `${data.voidAnalysis.void_rate}%`],
+        ["Revenue Lost", formatCurrency(data.voidAnalysis.revenue_lost)],
+        ["Total Orders", data.voidAnalysis.total_orders.toString()],
+      ],
+      maxChartHeight: 0
+    });
+  }
+
+  if (data.mostConsumed.length > 0) {
+    items.push({
+      title: "Most Consumed Ingredients",
+      subtitle: "Highest consumption volume",
+      canvasTitle: "Most Consumed Ingredients",
+      tableHead: ["Ingredient", "Quantity"],
+      tableBody: [...data.mostConsumed].sort((a,b)=>b.total_consumed-a.total_consumed).map(i => [`${i.item_name} (${i.unit})`, i.total_consumed.toString()]),
+      maxChartHeight: 50
+    });
+  }
+
+  if (data.leastConsumed.length > 0) {
+    items.push({
+      title: "Least Consumed Inventory",
+      subtitle: "Lowest consumption volume",
+      canvasTitle: "Least Consumed Inventory",
+      tableHead: ["Item", "Quantity"],
+      tableBody: [...data.leastConsumed].sort((a,b)=>a.total_consumed-b.total_consumed).map(i => [`${i.item_name} (${i.unit})`, i.total_consumed.toString()]),
+      maxChartHeight: 50
+    });
+  }
+
+  // Group into rows: first item is full width, rest are side-by-side pairs
+  const rows: GridItem[][] = [];
+  if (items.length > 0) rows.push([items[0]]);
+  for (let i = 1; i < items.length; i += 2) {
+    const row = [items[i]];
+    if (items[i+1]) row.push(items[i+1]);
+    rows.push(row);
+  }
+
+  rows.forEach(rowItems => {
+    // Estimate max height required for this row
+    let maxRequiredHeight = 0;
+    rowItems.forEach(item => {
+      let h = 25; // Title + Subtitle + Bottom spacing
+      if (item.canvasTitle) h += item.maxChartHeight + 10;
+      if (item.tableBody) h += 10 + (item.tableBody.length * 6) + 10; // Approx 6mm per row
+      if (h > maxRequiredHeight) maxRequiredHeight = h;
+    });
+
+    // Page break check
+    if (cy + maxRequiredHeight > pageHeight - margin) {
+      pdf.addPage();
+      cy = margin;
+    }
+
+    const startPage = (pdf as any).internal.getCurrentPageInfo().pageNumber;
+    let rowMaxY = cy;
+
+    rowItems.forEach((item, index) => {
+      // Reset to the starting page of the row for side-by-side items
+      pdf.setPage(startPage);
+      
+      let currentY = cy;
+      const isFull = rowItems.length === 1;
+      const itemWidth = isFull ? contentWidth : (contentWidth - GAP) / 2;
+      const itemX = margin + (index * (itemWidth + GAP));
+      
+      pdf.setFontSize(14);
+      pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      pdf.text(item.title, itemX, currentY);
+      currentY += 6;
+
+      if (item.subtitle) {
+        pdf.setFontSize(10);
+        pdf.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+        pdf.text(item.subtitle, itemX, currentY);
+        currentY += 6;
+      }
+
+      currentY += 4;
+
+      if (item.canvasTitle) {
+        const canvas = getCanvasByTitle(item.canvasTitle);
+        if (canvas) {
+          const imgData = canvas.toDataURL("image/png", 1.0);
+          const canvasRatio = canvas.height / canvas.width;
+          let imgHeight = itemWidth * canvasRatio;
+          
+          if (imgHeight > item.maxChartHeight) {
+            imgHeight = item.maxChartHeight;
+            const constrainedWidth = imgHeight / canvasRatio;
+            const xOffset = (itemWidth - constrainedWidth) / 2;
+            pdf.addImage(imgData, "PNG", itemX + xOffset, currentY, constrainedWidth, imgHeight);
+          } else {
+            pdf.addImage(imgData, "PNG", itemX, currentY, itemWidth, imgHeight);
+          }
+          
+          currentY += imgHeight + 10;
+        } else {
+          pdf.setFontSize(9);
+          pdf.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+          pdf.text("(No chart data)", itemX, currentY);
+          currentY += 10;
         }
       }
 
-      // Calculate dimensions to fit within the page
-      const canvasRatio = canvas.height / canvas.width;
-      const imgWidth = contentWidth;
-      const imgHeight = imgWidth * canvasRatio;
+      autoTable(pdf, {
+        startY: currentY,
+        head: [item.tableHead],
+        body: item.tableBody,
+        theme: 'striped',
+        headStyles: { fillColor: primaryColor as [number, number, number] },
+        styles: { fontSize: 8, cellPadding: 2 },
+        margin: { left: itemX, right: pageWidth - (itemX + itemWidth) }
+      });
 
-      // Check if chart + title fits on current page, otherwise add a new page
-      if (yOffset + imgHeight + 10 > pageHeight - margin) {
-        pdf.addPage();
-        yOffset = margin;
+      const finalY = (pdf as any).lastAutoTable.finalY;
+      if (finalY > rowMaxY) {
+        rowMaxY = finalY;
       }
-
-      // Add chart title
-      pdf.setFontSize(14);
-      pdf.setTextColor(58, 43, 39); // #3a2b27 (foreground)
-      pdf.text(chartTitle, margin, yOffset);
-      yOffset += 6; // Spacing below title
-
-      // Add the chart image
-      pdf.addImage(imgData, "PNG", margin, yOffset, imgWidth, imgHeight);
-      yOffset += imgHeight + 12; // 12mm spacing between charts
     });
 
-    // Save PDF
-    pdf.save("Sheilz_Analytics_Charts.pdf");
-  } catch (error) {
-    console.error("Error exporting charts to PDF:", error);
-    alert("Failed to export charts. Please try again.");
-  }
+    cy = rowMaxY + 15; 
+  });
+
+  addFooter(pdf);
+  pdf.save(`Sheilz_Analytics_${reportingPeriod.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 };
