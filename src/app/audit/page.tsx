@@ -147,25 +147,34 @@ export default function AuditPage() {
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 pb-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Audit Logs</h1>
-          <p className="text-sm text-muted-foreground">Review historical system activity, security events, and business-critical changes.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <Button variant="outline" className="flex-1 md:flex-none" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh Logs
-          </Button>
-          <div className="flex gap-2 flex-1 md:flex-none">
-            <Button variant="outline" className="flex-1 md:flex-none" onClick={() => handleExport("csv")} disabled={logs.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
+      <div className="flex flex-col gap-6 p-6 pb-4">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b border-[#C2456A]/10">
+          <div>
+            <p className="text-xs font-medium text-[#C2456A] uppercase tracking-widest mb-1">
+              System Monitoring
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Audit Logs
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Review historical system activity, security events, and business-critical changes.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button variant="outline" className="bg-background" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh Logs
             </Button>
-            <Button className="flex-1 md:flex-none" onClick={() => handleExport("xlsx")} disabled={logs.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="bg-background" onClick={() => handleExport("csv")} disabled={logs.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button onClick={() => handleExport("xlsx")} disabled={logs.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+            </div>
           </div>
         </div>
       </div>
