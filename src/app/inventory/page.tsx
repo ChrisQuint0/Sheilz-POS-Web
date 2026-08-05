@@ -28,6 +28,9 @@ import { ReplenishModal } from "./components/replenish-modal";
 import { SettingsModal } from "./components/settings-modal";
 import { useProfile } from "@/components/profile-provider";
 import { ErrorModal } from "./components/error-modal";
+import { ExportModal } from "@/app/sales/components/export-modal";
+import { exportInventoryToExcel } from "./utils/export-excel";
+import { exportLedgerToExcel } from "./utils/export-ledger-excel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,15 +58,15 @@ import {
 function getTransactionTypeBadgeClass(type: string): string {
   switch (type) {
     case "Replenishment":
-      return "bg-emerald-50 text-emerald-700";
+      return "bg-emerald-50 text-emerald-700 border border-emerald-200";
     case "Automatic POS Deduction":
-      return "bg-sky-50 text-sky-700";
+      return "bg-sky-50 text-sky-700 border border-sky-200";
     case "Manual Adjustment":
-      return "bg-amber-50 text-amber-700";
+      return "bg-amber-50 text-amber-700 border border-amber-200";
     case "Waste / Spoilage":
-      return "bg-rose-50 text-rose-700";
+      return "bg-rose-50 text-rose-700 border border-rose-200";
     default:
-      return "bg-gray-50 text-gray-600";
+      return "bg-gray-50 text-gray-600 border border-gray-200";
   }
 }
 
@@ -91,6 +94,7 @@ export default function InventoryPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [transactionDateFilter, setTransactionDateFilter] = useState("All Time");
 
   // Modals state
   const [modalOpen, setModalOpen] = useState(false);
@@ -103,6 +107,7 @@ export default function InventoryPage() {
   );
 
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Parse URL query parameter for low-stock filter on mount
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
@@ -232,6 +237,23 @@ export default function InventoryPage() {
       return matchesSearch && matchesCategory && matchesLowStock;
     });
   }, [items, searchQuery, categoryFilter, showLowStockOnly]);
+
+  const filteredTransactions = useMemo(() => {
+    if (transactionDateFilter === "all") return transactions;
+    const now = new Date();
+    return transactions.filter((txn) => {
+      const txnDate = new Date(txn.date);
+      if (transactionDateFilter === "today") {
+        return txnDate.toDateString() === now.toDateString();
+      }
+      const diffTime = Math.abs(now.getTime() - txnDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (transactionDateFilter === "7") return diffDays <= 7;
+      if (transactionDateFilter === "30") return diffDays <= 30;
+      if (transactionDateFilter === "90") return diffDays <= 90;
+      return true;
+    });
+  }, [transactions, transactionDateFilter]);
 
   // Quick stats
   const totalItems = items.length;
@@ -688,60 +710,31 @@ export default function InventoryPage() {
   };
 
   // Export Data
-  const handleExportData = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-
-    if (currentView === "inventory") {
-      csvContent += "Name,Category,Current Stock,Unit,Max Capacity,Status\n";
-      filteredItems.forEach((item) => {
-        const cat =
-          categories.find((c) => c.id === item.categoryId)?.name ||
-          "Uncategorized";
-        const row = [
-          item.name,
-          cat,
-          item.currentStock,
-          item.unit,
-          item.maxCapacity,
-          item.currentStock <= item.lowStockThreshold ? "Low" : "Healthy",
-        ];
-        csvContent += row.join(",") + "\n";
-      });
-    } else {
-      csvContent +=
-        "Date,Ingredient,Type,Change,Unit,New Stock,Cost,Payment Method,User\n";
-      transactions.forEach((txn) => {
-        const item = items.find((i) => i.id === txn.ingredientId);
-        const itemName = item?.name || "Unknown";
-        const unit = item?.unit || "";
-        const cost = txn.expenseDetails?.deliveryCost || 0;
-        const method = txn.expenseDetails?.paymentMethod || "-";
-        const date = new Date(txn.date).toLocaleString().replace(/,/g, "");
-        const row = [
-          date,
-          itemName,
-          txn.type,
-          txn.quantityChanged,
-          unit,
-          txn.newStock,
-          cost,
-          method,
-          txn.userId,
-        ];
-        csvContent += row.join(",") + "\n";
-      });
-    }
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `${currentView}_export_${new Date().toISOString().split("T")[0]}.csv`,
+  const handleExportData = async () => {
+    await exportInventoryToExcel(
+      filteredItems,
+      categories,
+      {
+        search: searchQuery,
+        category: categoryFilter,
+        showLowStockOnly: showLowStockOnly,
+      }
     );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  };
+
+  const handleExportTransactions = async (startDate: string, endDate: string, preset: string) => {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const txnsToExport = transactions.filter((txn) => {
+      const txnDate = new Date(txn.date);
+      return txnDate >= start && txnDate <= end;
+    });
+
+    await exportLedgerToExcel(txnsToExport, items, preset);
+    setIsExportModalOpen(false);
   };
 
   if (loading) {
@@ -756,46 +749,65 @@ export default function InventoryPage() {
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
       {/* Header */}
       <div className="flex flex-col gap-6 mb-8">
-        {/* Breadcrumb for Transactions */}
-        {currentView === "transactions" && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentView("inventory")}
-              className="flex items-center gap-1.5 text-sm text-[#C2456A] hover:text-[#a33858] font-medium transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Inventory
-            </button>
-            <ChevronRight className="w-4 h-4 text-gray-300" />
-            <span className="text-sm font-semibold text-[#3a2b27]">
-              Transactions Ledger
-            </span>
-          </div>
-        )}
-
         {/* Title + Actions */}
         <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b border-[#C2456A]/10">
-          <div>
-            <p className="text-xs font-medium text-[#C2456A] uppercase tracking-widest mb-1">
-              {currentView === "inventory"
-                ? "Stock Management"
-                : "Transaction History"}
-            </p>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              {currentView === "inventory" ? "Inventory" : ""}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {currentView === "inventory"
-                ? "Manage ingredients, monitor stock levels, and configure thresholds."
-                : "Historical record of replenishments, adjustments, and movements."}
-            </p>
+          <div className="flex items-start gap-4">
+            {currentView === "transactions" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCurrentView("inventory")}
+                className="mt-1 shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            )}
+            <div>
+              <p className="text-xs font-medium text-[#C2456A] uppercase tracking-widest mb-1">
+                {currentView === "inventory"
+                  ? "Stock Management"
+                  : "Transaction History"}
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                {currentView === "inventory" ? "Inventory" : "Inventory Ledger"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {currentView === "inventory"
+                  ? "Manage ingredients, monitor stock levels, and configure thresholds."
+                  : "Historical record of replenishments, adjustments, and movements."}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap shrink-0 self-start sm:self-auto">
+            {currentView === "transactions" && (
+              <Select
+                value={transactionDateFilter}
+                onValueChange={(val) => setTransactionDateFilter(val as string)}
+              >
+                <SelectTrigger className="w-40 h-9 bg-white border-gray-200 text-sm">
+                  <SelectValue placeholder="Select Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All Time">All Time</SelectItem>
+                  <SelectItem value="Today">Today</SelectItem>
+                  <SelectItem value="Last 7 Days">Last 7 Days</SelectItem>
+                  <SelectItem value="Last 30 Days">Last 30 Days</SelectItem>
+                  <SelectItem value="Last 90 Days">Last 90 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
             <Button
               variant="outline"
               className="h-9 bg-white border-gray-200 text-sm"
-              onClick={handleExportData}
+              onClick={() => {
+                if (currentView === "transactions") {
+                  setIsExportModalOpen(true);
+                } else {
+                  handleExportData();
+                }
+              }}
             >
               <Download className="w-4 h-4 mr-2" />
               Export
@@ -1005,7 +1017,7 @@ export default function InventoryPage() {
             >
               <AgGridReact
                 theme="legacy"
-                rowData={transactions}
+                rowData={filteredTransactions}
                 columnDefs={transactionColDefs}
                 defaultColDef={transactionDefaultColDef}
                 pagination={true}
@@ -1062,6 +1074,11 @@ export default function InventoryPage() {
           message={errorModal.message}
         />
       )}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={handleExportTransactions}
+      />
     </div>
   );
 }

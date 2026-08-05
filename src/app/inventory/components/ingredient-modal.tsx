@@ -206,6 +206,56 @@ export function IngredientModal({
         <div className="px-6 py-5 flex flex-col gap-5 overflow-y-auto min-h-0 flex-1">
           {step === 1 && (
             <div className="space-y-5">
+              {/* Category + Unit */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label className="text-[13px] font-semibold text-[#3a2b27]">
+                    Ingredient Group <span className="text-[#C2456A]">*</span>
+                  </Label>
+                  <Select
+                    value={formData.categoryId}
+                    onValueChange={(val) => handleChange("categoryId", val)}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-gray-200">
+                      <SelectValue>
+                        {categories.find((c) => c.id === formData.categoryId)
+                          ?.name || "Select Category"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-1">
+                  <Label className="text-[13px] font-semibold text-[#3a2b27]">
+                    Unit <span className="text-[#C2456A]">*</span>
+                  </Label>
+                  <Select
+                    value={formData.unit}
+                    onValueChange={(val) => handleChange("unit", val as Unit)}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-gray-200">
+                      <SelectValue>
+                        {formData.unit || "Select Unit"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {units.map((u) => (
+                        <SelectItem key={u} value={u}>
+                          {u}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Image Upload */}
               <div className="space-y-2">
                 <Label className="text-[13px] font-semibold text-[#3a2b27]">
@@ -265,56 +315,6 @@ export function IngredientModal({
                   placeholder="e.g. Espresso Beans"
                   className="h-10 bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20"
                 />
-              </div>
-
-              {/* Category + Unit */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[13px] font-semibold text-[#3a2b27]">
-                    Category <span className="text-[#C2456A]">*</span>
-                  </Label>
-                  <Select
-                    value={formData.categoryId}
-                    onValueChange={(val) => handleChange("categoryId", val)}
-                  >
-                    <SelectTrigger className="h-10 bg-white border-gray-200">
-                      <SelectValue>
-                        {categories.find((c) => c.id === formData.categoryId)
-                          ?.name || "Select Category"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[13px] font-semibold text-[#3a2b27]">
-                    Unit <span className="text-[#C2456A]">*</span>
-                  </Label>
-                  <Select
-                    value={formData.unit}
-                    onValueChange={(val) => handleChange("unit", val as Unit)}
-                  >
-                    <SelectTrigger className="h-10 bg-white border-gray-200">
-                      <SelectValue>
-                        {formData.unit || "Select Unit"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {units.map((u) => (
-                        <SelectItem key={u} value={u}>
-                          {u}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </div>
           )}
