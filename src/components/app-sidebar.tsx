@@ -14,6 +14,7 @@ import {
   ChevronsUpDown,
   PanelRight,
   LogOut,
+  UserRound,
 } from "lucide-react";
 
 import {
@@ -62,6 +63,11 @@ const navItems = [
     icon: ReceiptText,
   },
   {
+    title: "Customer Management",
+    url: "/customers",
+    icon: UserRound,
+  },
+  {
     title: "Inventory",
     url: "/inventory",
     icon: Package,
@@ -102,6 +108,7 @@ export function AppSidebar() {
       return [
         "Dashboard",
         "Sales History",
+        "Customer Management",
         "Inventory",
         "Team",
         "Analytics",
