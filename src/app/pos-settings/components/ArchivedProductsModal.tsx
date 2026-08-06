@@ -1,4 +1,3 @@
-// app/pos-settings/components/ArchivedProductsModal.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -9,20 +8,26 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArchiveRestore, PackageOpen, X, Calendar } from "lucide-react";
+import { Search, ArchiveRestore, PackageOpen, X, Trash2 } from "lucide-react";
 import { Product, Category } from "../types";
 import { createClient } from "@/app/lib/supabase/client";
 import { toast } from "sonner";
+import { deleteImage } from "@/app/lib/supabase/storage";
+import { AgGridReact } from "ag-grid-react";
+import {
+  ColDef,
+  GridReadyEvent,
+  GridApi,
+  ModuleRegistry,
+  AllCommunityModule,
+} from "ag-grid-community";
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
+import { AuthorizationModal } from "@/app/sales/components/authorization-modal";
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 interface ArchivedProductsModalProps {
   open: boolean;
@@ -41,6 +46,16 @@ export function ArchivedProductsModal({
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [gridApi, setGridApi] = useState<GridApi | null>(null);
+
+  const [authModal, setAuthModal] = useState<{
+    isOpen: boolean;
+    actionType: "edit" | "delete";
+    targetProduct?: Product;
+  }>({
+    isOpen: false,
+    actionType: "delete",
+  });
 
   const fetchArchivedProducts = async () => {
     setLoading(true);
@@ -122,9 +137,45 @@ export function ArchivedProductsModal({
     }
   };
 
-  const filteredProducts = archivedProducts.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const requestDelete = (product: Product) => {
+    setAuthModal({
+      isOpen: true,
+      actionType: "delete",
+      targetProduct: product,
+    });
+  };
+
+  const handleDeleteAuthorized = async () => {
+    const { targetProduct } = authModal;
+    if (!targetProduct) return;
+
+    const supabase = createClient();
+
+    if (targetProduct.image) {
+      try {
+        await deleteImage(targetProduct.image);
+      } catch (error) {
+        console.error("Failed to delete product image:", error);
+      }
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", targetProduct.id);
+
+    if (error) {
+      toast.error(`Failed to delete product: ${error.message}`);
+      setAuthModal({ isOpen: false, actionType: "delete" });
+      return;
+    }
+
+    toast.success("Product permanently deleted.");
+    setArchivedProducts((prev) =>
+      prev.filter((p) => p.id !== targetProduct.id)
+    );
+    setAuthModal({ isOpen: false, actionType: "delete" });
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -142,137 +193,202 @@ export function ArchivedProductsModal({
     return category ? category.name : "Uncategorized";
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] w-[90vw] lg:max-w-[80vw] lg:w-[80vw] xl:max-w-[70vw] xl:w-[70vw] max-h-[90vh] flex flex-col bg-white">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-[#3A2B27]">
-            Archived Products
-          </DialogTitle>
-          <DialogDescription className="text-[#826F69]">
-            Products that have been archived will not appear in the active POS
-            catalog. Restore them to make them available again.
-          </DialogDescription>
-        </DialogHeader>
+  const onGridReady = (params: GridReadyEvent) => {
+    setGridApi(params.api);
+    params.api.sizeColumnsToFit();
+  };
 
-        <div className="flex flex-col flex-1 min-h-0 gap-4">
-          {/* Search Bar */}
-          <div className="relative flex-1 sm:flex-none sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#826F69] pointer-events-none" />
-            <Input
-              placeholder="Search archived products..."
-              className="pl-9 h-9 text-sm bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+  useEffect(() => {
+    if (gridApi) {
+      gridApi.setGridOption("quickFilterText", searchQuery);
+    }
+  }, [searchQuery, gridApi]);
 
-          {/* Products Table */}
-          <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-[#826F69] text-sm">
-                  Loading archived products...
-                </p>
-              </div>
-            ) : archivedProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 gap-4">
-                <div className="p-4 bg-[#FBE4EA]/50 rounded-full">
-                  <PackageOpen className="w-8 h-8 text-[#C2456A]" />
-                </div>
-                <div className="text-center">
-                  <p className="text-[#3A2B27] font-medium">
-                    No archived products
-                  </p>
-                  <p className="text-[#826F69] text-sm">
-                    Archived products will appear here for restoration.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#FFFBF8] hover:bg-[#FFFBF8]">
-                    <TableHead className="text-[#3A2B27] font-semibold">
-                      Product Name
-                    </TableHead>
-                    <TableHead className="text-[#3A2B27] font-semibold">
-                      Category
-                    </TableHead>
-                    <TableHead className="text-[#3A2B27] font-semibold">
-                      Type
-                    </TableHead>
-                    <TableHead className="text-[#3A2B27] font-semibold">
-                      Archived Date
-                    </TableHead>
-                    <TableHead className="text-right text-[#3A2B27] font-semibold">
-                      Action
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id} className="hover:bg-[#FFFBF8]">
-                      <TableCell className="font-medium text-[#3A2B27]">
-                        {product.name}
-                      </TableCell>
-                      <TableCell className="text-[#826F69]">
-                        {getCategoryName(product.categoryId)}
-                      </TableCell>
-                      <TableCell className="text-[#826F69] capitalize">
-                        {product.type || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-[#826F69]">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span className="text-sm">
-                            {product.archivedAt
-                              ? formatDate(product.archivedAt)
-                              : "—"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-[#C2456A]/30 text-[#C2456A] hover:bg-[#FBE4EA] hover:text-[#C2456A] hover:border-[#C2456A] transition-colors"
-                          onClick={() => handleUnarchive(product.id)}
-                          disabled={restoringId === product.id}
-                        >
-                          <ArchiveRestore className="w-4 h-4 mr-1.5" />
-                          {restoringId === product.id
-                            ? "Restoring..."
-                            : "Restore"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-
-          {/* Footer Stats */}
-          {!loading && archivedProducts.length > 0 && (
-            <div className="flex items-center justify-between text-sm text-[#826F69] border-t border-gray-200 pt-4">
-              <span>
-                {filteredProducts.length} of {archivedProducts.length} archived
-                products
-              </span>
+  const colDefs = React.useMemo<ColDef<Product>[]>(
+    () => [
+      {
+        field: "name",
+        headerName: "Product Name",
+        flex: 1,
+        minWidth: 200,
+      },
+      {
+        field: "categoryId",
+        headerName: "Category",
+        valueGetter: (params) =>
+          getCategoryName(params.data?.categoryId || ""),
+        minWidth: 150,
+      },
+      {
+        field: "type",
+        headerName: "Type",
+        valueFormatter: (params) =>
+          params.value
+            ? params.value.charAt(0).toUpperCase() + params.value.slice(1)
+            : "—",
+        minWidth: 120,
+      },
+      {
+        field: "archivedAt",
+        headerName: "Archived Date",
+        valueFormatter: (params) =>
+          params.value ? formatDate(params.value) : "—",
+        minWidth: 180,
+      },
+      {
+        headerName: "Action",
+        pinned: "right",
+        width: 180,
+        minWidth: 180,
+        maxWidth: 180,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: any) => {
+          if (!params.data) return null;
+          return (
+            <div className="flex items-center gap-2 h-full">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[#C2456A]/30 text-[#C2456A] hover:bg-[#FBE4EA] hover:text-[#C2456A] hover:border-[#C2456A] transition-colors"
+                onClick={() => handleUnarchive(params.data.id)}
+                disabled={restoringId === params.data.id}
+              >
+                <ArchiveRestore className="w-4 h-4 mr-1.5" />
+                {restoringId === params.data.id ? "Restoring..." : "Restore"}
+              </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="text-[#826F69] hover:text-[#C2456A]"
-                onClick={() => setSearchQuery("")}
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => requestDelete(params.data)}
               >
-                <X className="w-4 h-4 mr-1" />
-                Clear search
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          );
+        },
+      },
+    ],
+    [restoringId, categories]
+  );
+
+  const defaultColDef = React.useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+      suppressMovable: true,
+    }),
+    []
+  );
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[90vw] w-[90vw] lg:max-w-[80vw] lg:w-[80vw] xl:max-w-[70vw] xl:w-[70vw] max-h-[90vh] flex flex-col bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-[#3A2B27]">
+              Archived Products
+            </DialogTitle>
+            <DialogDescription className="text-[#826F69]">
+              Products that have been archived will not appear in the active POS
+              catalog. Restore them to make them available again.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col flex-1 min-h-0 gap-4">
+            {/* Search Bar */}
+            <div className="relative flex-1 sm:flex-none sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#826F69] pointer-events-none" />
+              <Input
+                placeholder="Search archived products..."
+                className="pl-9 h-9 text-sm bg-white border-gray-200 focus:border-[#C2456A] focus:ring-[#C2456A]/20"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Products Table */}
+            <div className="flex-1 min-h-[400px] w-full border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-[#826F69] text-sm">
+                    Loading archived products...
+                  </p>
+                </div>
+              ) : archivedProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <div className="p-4 bg-[#FBE4EA]/50 rounded-full">
+                    <PackageOpen className="w-8 h-8 text-[#C2456A]" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[#3A2B27] font-medium">
+                      No archived products
+                    </p>
+                    <p className="text-[#826F69] text-sm">
+                      Archived products will appear here for restoration.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="ag-theme-quartz"
+                  style={{ height: 400, width: "100%" }}
+                >
+                  <AgGridReact
+                    modules={[AllCommunityModule]}
+                    theme="legacy"
+                    rowData={archivedProducts}
+                    columnDefs={colDefs}
+                    defaultColDef={defaultColDef}
+                    onGridReady={onGridReady}
+                    rowHeight={56}
+                    headerHeight={48}
+                    suppressCellFocus={true}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Footer Stats */}
+            {!loading && archivedProducts.length > 0 && (
+              <div className="flex items-center justify-between text-sm text-[#826F69] border-t border-gray-200 pt-4">
+                <span>
+                  {/* Using the filtered count here correctly requires us to compute it, but since we use AG grid quick filter, we can't easily get it directly unless we track filtered count. For now we will just show total length. */}
+                  Total {archivedProducts.length} archived products
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[#826F69] hover:text-[#C2456A]"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear search
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <AuthorizationModal
+        isOpen={authModal.isOpen}
+        onClose={() => setAuthModal({ isOpen: false, actionType: "delete" })}
+        onAuthorize={handleDeleteAuthorized}
+        actionType="delete"
+        customTitle="Authorize Permanent Deletion"
+        customDescription={
+          <span className="space-y-2 block">
+            <span className="block">
+              Deleting a product permanently will remove it from the database entirely. This will also permanently delete any associated recipes and variants.
+            </span>
+            <span className="font-semibold text-foreground block">
+              This action cannot be undone. All deletions will be recorded in the audit logs.
+            </span>
+          </span>
+        }
+      />
+    </>
   );
 }

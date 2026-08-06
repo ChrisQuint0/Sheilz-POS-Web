@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +22,10 @@ import {
   Edit2,
   Check,
   X,
+  ImagePlus,
 } from "lucide-react";
 import { createClient } from "@/app/lib/supabase/client";
+import { uploadImage, replaceImage } from "@/app/lib/supabase/storage";
 
 interface MoreSettingsModalProps {
   open: boolean;
@@ -60,6 +62,10 @@ export function MoreSettingsModal({
   // --- Edit state ---
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  // --- Payment Image Upload state ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPaymentId, setUploadingPaymentId] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -162,6 +168,47 @@ export function MoreSettingsModal({
   };
 
   // --- Payment handlers ---
+  const handleUploadClick = (paymentId: string) => {
+    setUploadingPaymentId(paymentId);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadingPaymentId) return;
+
+    setIsLoading(true);
+    try {
+      const payment = paymentMethods.find((p) => p.id === uploadingPaymentId);
+      if (!payment) return;
+
+      let publicUrl;
+      if (payment.image) {
+        publicUrl = await replaceImage(payment.image, file, "payments", payment.id);
+      } else {
+        publicUrl = await uploadImage(file, "payments", payment.id);
+      }
+
+      const { error } = await supabase
+        .from("payment_methods")
+        .update({ image_url: publicUrl })
+        .eq("id", payment.id);
+
+      if (error) throw error;
+
+      setPaymentMethods((prev) =>
+        prev.map((p) => (p.id === payment.id ? { ...p, image: publicUrl } : p))
+      );
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      alert("Failed to upload image");
+    } finally {
+      setIsLoading(false);
+      setUploadingPaymentId(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleAddPayment = async () => {
     if (!newPaymentName.trim()) return;
     setIsLoading(true);
@@ -615,6 +662,13 @@ export function MoreSettingsModal({
                   Payment Methods
                 </h3>
                 <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
                   <Input
                     placeholder="New payment method"
                     value={newPaymentName}
@@ -678,6 +732,9 @@ export function MoreSettingsModal({
                       <>
                         <div className="flex items-center gap-3">
                           <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" />
+                          {pm.image && (
+                            <img src={pm.image} alt={pm.name} className="w-8 h-8 object-contain rounded border bg-white" />
+                          )}
                           <span className="font-medium text-sm text-[#3a2b27]">
                             {pm.name}
                           </span>
@@ -696,6 +753,14 @@ export function MoreSettingsModal({
                             />
                           </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                              onClick={() => handleUploadClick(pm.id)}
+                              className="text-gray-300 hover:text-indigo-500 p-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
+                              disabled={isLoading}
+                              title="Upload Logo"
+                            >
+                              <ImagePlus className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => startEdit(pm.id, pm.name)}
                               className="text-gray-300 hover:text-blue-500 p-1.5 rounded-lg hover:bg-blue-50 disabled:opacity-50"

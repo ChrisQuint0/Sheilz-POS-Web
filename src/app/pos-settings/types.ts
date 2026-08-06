@@ -34,6 +34,7 @@ export interface PaymentMethod {
   id: string;
   name: string;
   isEnabled: boolean;
+  image?: string;
 }
 
 export interface Size {

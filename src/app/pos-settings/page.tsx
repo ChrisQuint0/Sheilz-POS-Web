@@ -72,7 +72,7 @@ export default function POSSettingsPage() {
           supabase.from("product_categories").select("id, name").order("name"),
           supabase
             .from("payment_methods")
-            .select("id, name, is_enabled")
+            .select("id, name, is_enabled, image_url")
             .order("name"),
           supabase
             .from("sizes")
@@ -115,6 +115,7 @@ export default function POSSettingsPage() {
               id: pm.id,
               name: pm.name,
               isEnabled: pm.is_enabled,
+              image: pm.image_url ?? undefined,
             })),
           );
         }

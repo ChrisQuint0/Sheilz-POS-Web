@@ -25,7 +25,7 @@ function extractFilePath(imageUrl: string): string | null {
  */
 export async function uploadImage(
   file: File,
-  folder: 'products' | 'inventory',
+  folder: 'products' | 'inventory' | 'payments',
   itemId: string
 ): Promise<string> {
   const supabase = createClient();
@@ -89,7 +89,7 @@ export async function deleteImage(imageUrl: string): Promise<void> {
 export async function replaceImage(
   oldImageUrl: string | null,
   newFile: File,
-  folder: 'products' | 'inventory',
+  folder: 'products' | 'inventory' | 'payments',
   itemId: string
 ): Promise<string> {
   // Delete old image if it exists

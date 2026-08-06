@@ -19,6 +19,8 @@ interface AuthorizationModalProps {
   onClose: () => void;
   onAuthorize: () => void;
   actionType: "edit" | "delete";
+  customTitle?: string;
+  customDescription?: React.ReactNode;
 }
 
 export function AuthorizationModal({
@@ -26,6 +28,8 @@ export function AuthorizationModal({
   onClose,
   onAuthorize,
   actionType,
+  customTitle,
+  customDescription,
 }: AuthorizationModalProps) {
   const { profile } = useProfile();
   const isDelete = actionType === "delete";
@@ -99,36 +103,38 @@ export function AuthorizationModal({
                 className={`flex items-center gap-2 ${isDelete ? "text-destructive" : "text-amber-600"}`}
               >
                 <AlertTriangle className="h-5 w-5" />
-                {isDelete ? "Authorize Deletion" : "Authorize Edit"}
+                {customTitle || (isDelete ? "Authorize Deletion" : "Authorize Edit")}
               </DialogTitle>
               <DialogDescription className="pt-2 text-sm text-muted-foreground">
-                <span className="space-y-2 block">
-                  {isDelete ? (
-                    <>
-                      <span className="block">
-                        Deleting transaction records may permanently affect
-                        reporting accuracy, revenue calculations, inventory
-                        consumption records, and analytics.
-                      </span>
-                      <span className="font-semibold text-foreground block">
-                        This action cannot be undone. All deletions will be
-                        recorded in the audit logs.
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="block">
-                        Editing transaction records can affect reports,
-                        analytics, inventory calculations, and financial data.
-                      </span>
-                      <span className="font-semibold text-foreground block">
-                        Proceed only if this correction is absolutely necessary.
-                        This action will be permanently recorded in the audit
-                        logs.
-                      </span>
-                    </>
-                  )}
-                </span>
+                {customDescription || (
+                  <span className="space-y-2 block">
+                    {isDelete ? (
+                      <>
+                        <span className="block">
+                          Deleting transaction records may permanently affect
+                          reporting accuracy, revenue calculations, inventory
+                          consumption records, and analytics.
+                        </span>
+                        <span className="font-semibold text-foreground block">
+                          This action cannot be undone. All deletions will be
+                          recorded in the audit logs.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block">
+                          Editing transaction records can affect reports,
+                          analytics, inventory calculations, and financial data.
+                        </span>
+                        <span className="font-semibold text-foreground block">
+                          Proceed only if this correction is absolutely necessary.
+                          This action will be permanently recorded in the audit
+                          logs.
+                        </span>
+                      </>
+                    )}
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
 
