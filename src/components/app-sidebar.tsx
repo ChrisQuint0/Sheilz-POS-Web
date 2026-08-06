@@ -122,7 +122,7 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border px-2">
         <div className="flex items-center w-full justify-between">
           <div
-            className="flex items-center gap-2 cursor-pointer w-full group-data-[collapsible=icon]:justify-center group/logo"
+            className="flex items-end pb-1.5 gap-2 cursor-pointer w-full group-data-[collapsible=icon]:justify-center group/logo"
             onClick={() => {
               if (state === "collapsed") toggleSidebar();
             }}
