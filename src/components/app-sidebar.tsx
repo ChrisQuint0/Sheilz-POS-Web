@@ -15,6 +15,7 @@ import {
   PanelRight,
   LogOut,
   UserRound,
+  Activity,
 } from "lucide-react";
 
 import {
@@ -87,6 +88,11 @@ const navItems = [
     url: "/analytics",
     icon: BarChart3,
   },
+  {
+    title: "Diagnostics",
+    url: "/diagnostics",
+    icon: Activity,
+  },
 ];
 
 export function AppSidebar() {
@@ -112,6 +118,7 @@ export function AppSidebar() {
         "Inventory",
         "Team",
         "Analytics",
+        "Diagnostics",
       ].includes(item.title);
     }
     if (role === "Cashier") {
