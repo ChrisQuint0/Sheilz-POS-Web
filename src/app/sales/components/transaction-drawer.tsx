@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Transaction } from "../data";
 import { format } from "date-fns";
 import { useProfile } from "@/components/profile-provider";
+import { Mail } from "lucide-react";
+import { DigitalReceiptModal } from "./digital-receipt-modal";
 
 interface TransactionDrawerProps {
   transaction: Transaction | null;
@@ -47,6 +49,7 @@ export function TransactionDrawer({
   const [localStatus, setLocalStatus] = useState<string>("");
   const [localPaymentMethod, setLocalPaymentMethod] = useState<string>("");
   const [localCustomer, setLocalCustomer] = useState<string>("");
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   useEffect(() => {
     if (transaction && isOpen) {
@@ -287,6 +290,16 @@ export function TransactionDrawer({
 
         <SheetFooter className="p-6 pt-0 border-t mt-auto flex flex-col gap-2 sm:flex-col sm:space-x-0 shrink-0">
           <div className="flex w-full gap-2 pt-4">
+            <Button
+              variant="outline"
+              className="flex-1 border-primary/20 text-primary hover:bg-primary/5"
+              onClick={() => setIsReceiptModalOpen(true)}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Send to Email
+            </Button>
+          </div>
+          <div className="flex w-full gap-2 pt-2">
             {isManagerOrAdmin && (
               <>
                 <Button
@@ -319,6 +332,12 @@ export function TransactionDrawer({
           </div>
         </SheetFooter>
       </SheetContent>
+
+      <DigitalReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        transaction={transaction}
+      />
     </Sheet>
   );
 }
