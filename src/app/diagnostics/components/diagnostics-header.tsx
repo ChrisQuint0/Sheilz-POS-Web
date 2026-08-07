@@ -3,6 +3,7 @@ import { Download, RefreshCw, Activity, Loader2 } from "lucide-react";
 import { StatusBadge } from "./ui/status-badge";
 import { systemHealth } from "../mock-data";
 import { useState } from "react";
+import { generateDiagnosticsPDF } from "../utils/generate-pdf";
 
 interface DiagnosticsHeaderProps {
   onRefresh: () => void;
@@ -15,23 +16,17 @@ export function DiagnosticsHeader({
 }: DiagnosticsHeaderProps) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
-    setTimeout(() => {
+    try {
+      // Small delay to allow UI to update to loading state
+      await new Promise(resolve => setTimeout(resolve, 100));
+      generateDiagnosticsPDF();
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+    } finally {
       setIsExporting(false);
-      // Mock export logic
-      const el = document.createElement("a");
-      el.setAttribute(
-        "href",
-        "data:text/plain;charset=utf-8," +
-          encodeURIComponent("Diagnostics Export Mock"),
-      );
-      el.setAttribute("download", "Diagnostics_Report.txt");
-      el.style.display = "none";
-      document.body.appendChild(el);
-      el.click();
-      document.body.removeChild(el);
-    }, 1500);
+    }
   };
 
   return (
