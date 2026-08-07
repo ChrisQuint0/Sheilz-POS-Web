@@ -138,6 +138,7 @@ export default function InventoryPage() {
             currentStock: row.current_stock,
             maxCapacity: row.max_capacity,
             lowStockThreshold: row.low_stock_threshold,
+            unitCost: row.name.toLowerCase().includes('tea') ? 12.00 : row.name.toLowerCase().includes('arabica') ? 0.85 : 5.50, // Mock frontend-only cost
             imageUrl: row.image_url,
             notes: row.notes,
             createdAt: row.created_at,
@@ -446,6 +447,7 @@ export default function InventoryPage() {
         notes: data.notes,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        unitCost: ingredientData.unitCost,
       };
       setItems((prev) =>
         prev.map((i) => (i.id === selectedItem.id ? updatedItem : i)),
@@ -522,6 +524,7 @@ export default function InventoryPage() {
         notes: data.notes,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        unitCost: ingredientData.unitCost,
       };
       setItems((prev) => [...prev, newItem]);
     }

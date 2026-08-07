@@ -55,6 +55,7 @@ export function IngredientModal({
   const [step, setStep] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [unitCostTouched, setUnitCostTouched] = useState(false);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,6 +99,7 @@ export function IngredientModal({
       setStep(1);
       setConfirmDelete(false);
       setReasonForChange("");
+      setUnitCostTouched(false);
       if (item) {
         setFormData({ ...item });
       } else {
@@ -110,6 +112,7 @@ export function IngredientModal({
           lowStockThreshold: 0,
           notes: "",
           imageUrl: "",
+          unitCost: undefined,
         });
       }
     }
@@ -134,7 +137,7 @@ export function IngredientModal({
   const isSaveDisabled = stockFieldsChanged && !reasonForChange;
 
   const canProceedToStep2 =
-    formData.name && formData.categoryId && formData.unit;
+    formData.name && formData.categoryId && formData.unit && formData.unitCost !== undefined && formData.unitCost >= 0;
 
   const steps = [
     { label: "Details", num: 1 },
@@ -206,9 +209,9 @@ export function IngredientModal({
         <div className="px-6 py-5 flex flex-col gap-5 overflow-y-auto min-h-0 flex-1">
           {step === 1 && (
             <div className="space-y-5">
-              {/* Category + Unit */}
+              {/* Category + Unit + Unit Cost */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2 sm:col-span-2">
+                <div className="space-y-2 sm:col-span-1">
                   <Label className="text-[13px] font-semibold text-[#3a2b27]">
                     Ingredient Group <span className="text-[#C2456A]">*</span>
                   </Label>
@@ -253,6 +256,33 @@ export function IngredientModal({
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-1">
+                  <Label className="text-[13px] font-semibold text-[#3a2b27]">
+                    Unit Cost <span className="text-[#C2456A]">*</span>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₱</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.unitCost !== undefined ? formData.unitCost : ""}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                        handleChange("unitCost", val);
+                      }}
+                      onBlur={() => setUnitCostTouched(true)}
+                      placeholder="0.00"
+                      className={`h-10 bg-white pl-7 focus:ring-[#C2456A]/20 ${unitCostTouched && (formData.unitCost === undefined || formData.unitCost < 0 || isNaN(formData.unitCost)) ? "border-rose-500 focus:border-rose-500" : "border-gray-200 focus:border-[#C2456A]"}`}
+                    />
+                  </div>
+                  {unitCostTouched && (formData.unitCost === undefined || formData.unitCost < 0 || isNaN(formData.unitCost)) ? (
+                    <p className="text-[11px] font-medium text-rose-500 mt-1">Please enter a valid unit cost.</p>
+                  ) : (
+                    <p className="text-[11px] text-gray-500 mt-1">Cost per {formData.unit || "unit"}</p>
+                  )}
                 </div>
               </div>
 

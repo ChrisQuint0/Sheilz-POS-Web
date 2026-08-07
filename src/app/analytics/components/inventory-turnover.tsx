@@ -20,15 +20,12 @@ import {
 export interface InventoryTurnoverData {
   turnoverRate: number;
   inventoryDays: number;
-  cogs: number;
+  estimatedCogs: number;
   averageInventory: number;
-  previousTurnoverRate: number;
-  trend: "up" | "down" | "flat";
-  status: "Healthy" | "Moderate" | "Low Turnover";
-  insight: string;
-  historicalData: {
-    period: string;
-    rate: number;
+  previousPeriodTurnover?: number;
+  trend: {
+    label: string;
+    value: number;
   }[];
 }
 
@@ -38,17 +35,14 @@ export interface InventoryTurnoverData {
 const MOCK_TURNOVER_DATA: InventoryTurnoverData = {
   turnoverRate: 4.2,
   inventoryDays: 8.6,
-  cogs: 45250,
+  estimatedCogs: 45250,
   averageInventory: 10773,
-  previousTurnoverRate: 3.73, // giving an ~12.5% increase
-  trend: "up",
-  status: "Healthy",
-  insight: "Inventory is moving efficiently during the selected period.",
-  historicalData: [
-    { period: "Week 1", rate: 3.2 },
-    { period: "Week 2", rate: 3.5 },
-    { period: "Week 3", rate: 3.9 },
-    { period: "Week 4", rate: 4.2 },
+  previousPeriodTurnover: 3.73,
+  trend: [
+    { label: "Week 1", value: 3.2 },
+    { label: "Week 2", value: 3.5 },
+    { label: "Week 3", value: 3.9 },
+    { label: "Week 4", value: 4.2 },
   ],
 };
 
@@ -96,24 +90,23 @@ export function InventoryTurnover() {
   const formatCurrency = (val: number) => `₱${val.toLocaleString()}`;
 
   // Trend calculations
-  const trendPercent = Math.abs(((data.turnoverRate - data.previousTurnoverRate) / data.previousTurnoverRate) * 100).toFixed(1);
-  
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Healthy": return "text-emerald-600 bg-emerald-50 border-emerald-200";
-      case "Moderate": return "text-orange-600 bg-orange-50 border-orange-200";
-      case "Low Turnover": return "text-red-600 bg-red-50 border-red-200";
-      default: return "text-gray-600 bg-gray-50 border-gray-200";
-    }
-  };
+  const changePercent = data.previousPeriodTurnover 
+    ? ((data.turnoverRate - data.previousPeriodTurnover) / data.previousPeriodTurnover) * 100 
+    : null;
+    
+  const trendDirection = changePercent !== null 
+    ? (changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat") 
+    : null;
 
   // Chart configuration
+  const safeTrend = Array.isArray(data.trend) ? data.trend : [];
+
   const chartData = {
-    labels: data.historicalData.map(d => d.period),
+    labels: safeTrend.map(d => d.label),
     datasets: [
       {
         label: "Turnover Rate",
-        data: data.historicalData.map(d => d.rate),
+        data: safeTrend.map(d => d.value),
         borderColor: chartColors.primary,
         backgroundColor: chartColors.primaryLight,
         borderWidth: 2,
@@ -175,15 +168,11 @@ export function InventoryTurnover() {
                   <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-xs text-xs">
-                  <p className="mb-2"><strong>Inventory turnover</strong> shows how many times inventory is sold and replenished during the selected period. A higher turnover generally indicates faster inventory movement, while a lower turnover may indicate slower-moving stock.</p>
-                  <p><strong>Inventory days</strong> estimates how long inventory remains in stock before being sold.</p>
+                  <p>Inventory turnover measures how efficiently inventory is being consumed during the selected period. Higher turnover generally means inventory is being used more frequently.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
-          <div className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getStatusColor(data.status)}`}>
-            {data.status}
-          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           How efficiently inventory is being sold and replenished
@@ -198,12 +187,14 @@ export function InventoryTurnover() {
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold">{data.turnoverRate.toFixed(1)}×</span>
               </div>
-              <p className={`text-xs font-medium flex items-center mt-1 ${data.trend === "up" ? "text-emerald-600" : data.trend === "down" ? "text-red-600" : "text-muted-foreground"}`}>
-                {data.trend === "up" && <TrendingUp className="h-3 w-3 mr-1" />}
-                {data.trend === "down" && <TrendingDown className="h-3 w-3 mr-1" />}
-                {data.trend === "flat" && <Minus className="h-3 w-3 mr-1" />}
-                {data.trend === "up" ? "↑" : data.trend === "down" ? "↓" : ""} {trendPercent}% vs. previous period
-              </p>
+              {changePercent !== null && trendDirection !== null && (
+                <p className={`text-xs font-medium flex items-center mt-1 ${trendDirection === "up" ? "text-emerald-600" : trendDirection === "down" ? "text-red-600" : "text-muted-foreground"}`}>
+                  {trendDirection === "up" && <TrendingUp className="h-3 w-3 mr-1" />}
+                  {trendDirection === "down" && <TrendingDown className="h-3 w-3 mr-1" />}
+                  {trendDirection === "flat" && <Minus className="h-3 w-3 mr-1" />}
+                  {trendDirection === "up" ? "↑" : trendDirection === "down" ? "↓" : ""} {Math.abs(changePercent).toFixed(1)}% vs. previous period
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Days in Inventory</p>
@@ -216,11 +207,23 @@ export function InventoryTurnover() {
 
           <div className="flex items-center gap-4 text-xs mb-4 p-3 bg-muted/30 rounded-md border border-muted/50">
             <div className="flex-1">
-              <span className="text-muted-foreground block mb-0.5">COGS</span>
-              <span className="font-semibold text-sm">{formatCurrency(data.cogs)}</span>
+              <span className="text-muted-foreground flex items-center gap-1 mb-0.5">
+                Estimated COGS
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">
+                      <p>Estimated inventory consumption cost based on POS inventory deductions and current ingredient unit costs.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
+              <span className="font-semibold text-sm">{formatCurrency(data.estimatedCogs)}</span>
             </div>
             <div className="flex-1 border-l border-border pl-4">
-              <span className="text-muted-foreground block mb-0.5">Avg Inventory</span>
+              <span className="text-muted-foreground block mb-0.5">Average Inventory</span>
               <span className="font-semibold text-sm">{formatCurrency(data.averageInventory)}</span>
             </div>
           </div>
@@ -228,12 +231,6 @@ export function InventoryTurnover() {
 
         <div className="flex-1 min-h-[140px] w-full mt-2">
           <Line data={chartData} options={chartOptions as any} />
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-border/50">
-          <p className="text-[13px] text-muted-foreground/90 italic">
-            "{data.insight}"
-          </p>
         </div>
       </CardContent>
     </Card>

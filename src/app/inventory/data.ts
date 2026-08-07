@@ -19,6 +19,7 @@ export interface InventoryItem {
   currentStock: number;
   maxCapacity: number;
   lowStockThreshold: number;
+  unitCost?: number;
   imageUrl?: string;
   notes?: string;
   createdAt: string;
