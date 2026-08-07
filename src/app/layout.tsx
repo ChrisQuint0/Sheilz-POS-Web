@@ -4,6 +4,7 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { ProfileProvider } from "@/components/profile-provider";
+import { SheilzAIProvider } from "@/components/sheilz-ai/sheilz-ai-context";
 import { Toaster } from "sonner";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -28,10 +29,12 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <ProfileProvider>
-          <TooltipProvider>
-            <DashboardLayout>{children}</DashboardLayout>
-            <Toaster richColors position="top-right" />
-          </TooltipProvider>
+          <SheilzAIProvider>
+            <TooltipProvider>
+              <DashboardLayout>{children}</DashboardLayout>
+              <Toaster richColors position="top-right" />
+            </TooltipProvider>
+          </SheilzAIProvider>
         </ProfileProvider>
       </body>
     </html>

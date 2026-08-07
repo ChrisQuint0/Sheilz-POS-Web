@@ -4,6 +4,7 @@ import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
 import { usePathname } from "next/navigation"
+import { SheilzAIWidget } from "@/components/sheilz-ai/sheilz-ai-widget"
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,10 +18,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <main className="flex flex-1 flex-col p-4 lg:p-8">
+        <main className="flex flex-1 flex-col p-4 lg:p-8 relative">
           {children}
         </main>
       </SidebarInset>
+      <SheilzAIWidget />
     </SidebarProvider>
   )
 }

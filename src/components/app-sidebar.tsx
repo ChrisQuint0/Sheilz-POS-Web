@@ -16,6 +16,8 @@ import {
   LogOut,
   UserRound,
   Activity,
+  BotOff,
+  Bot,
 } from "lucide-react";
 
 import {
@@ -46,6 +48,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/components/profile-provider";
+import { useSheilzAI } from "@/components/sheilz-ai/sheilz-ai-context";
 
 const navItems = [
   {
@@ -99,6 +102,7 @@ export function AppSidebar() {
   const { toggleSidebar, state } = useSidebar();
   const pathname = usePathname();
   const { profile, loading, signOut } = useProfile();
+  const { isWidgetVisible, toggleWidget } = useSheilzAI();
 
   // Display name and email — use profile data when available, fallback to skeleton-like defaults
   const displayName = profile?.display_name ?? "Loading...";
@@ -264,6 +268,18 @@ export function AppSidebar() {
                     </div>
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={toggleWidget}
+                  className="cursor-pointer"
+                >
+                  {isWidgetVisible ? (
+                    <BotOff className="mr-2 size-4" />
+                  ) : (
+                    <Bot className="mr-2 size-4" />
+                  )}
+                  {isWidgetVisible ? "Hide Sheilz AI" : "Show Sheilz AI"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={signOut}
