@@ -9,6 +9,7 @@ import { CategoryPerformance } from "./components/category-performance";
 import { PeakActivity } from "./components/peak-activity";
 import { PaymentInsights } from "./components/payment-insights";
 import { InventoryAnalytics } from "./components/inventory-analytics";
+import { InventoryTurnover } from "./components/inventory-turnover";
 import { OperationalInsights } from "./components/operational-insights";
 import { exportToExcel, exportChartsToPDF } from "./utils/export-utils";
 
@@ -56,6 +57,9 @@ function AnalyticsDashboard() {
 
           {/* Row 5: Most Consumed (2col) + Least Consumed (1col) */}
           <InventoryAnalytics />
+
+          {/* Row 6: Inventory Turnover (1col) */}
+          <InventoryTurnover />
         </div>
       </div>
     </div>
