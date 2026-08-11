@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Line } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultChartOptions, chartColors } from "./chart-setup";
-import { RefreshCw, Info, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
+import { RefreshCw, Info, TrendingUp, TrendingDown, Minus, Loader2, AlertCircle } from "lucide-react";
 import { useAnalytics } from "../analytics-context";
 import {
   Tooltip,
@@ -13,59 +13,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// ----------------------------------------------------------------------
-// TYPES (Frontend Only)
-// ----------------------------------------------------------------------
-// MOCK DATA INTERFACE - To be replaced by actual backend schema
-export interface InventoryTurnoverData {
-  turnoverRate: number;
-  inventoryDays: number;
-  estimatedCogs: number;
-  averageInventory: number;
-  previousPeriodTurnover?: number;
-  trend: {
-    label: string;
-    value: number;
-  }[];
-}
-
-// ----------------------------------------------------------------------
-// MOCK DATA (To be replaced when backend is ready)
-// ----------------------------------------------------------------------
-const MOCK_TURNOVER_DATA: InventoryTurnoverData = {
-  turnoverRate: 4.2,
-  inventoryDays: 8.6,
-  estimatedCogs: 45250,
-  averageInventory: 10773,
-  previousPeriodTurnover: 3.73,
-  trend: [
-    { label: "Week 1", value: 3.2 },
-    { label: "Week 2", value: 3.5 },
-    { label: "Week 3", value: 3.9 },
-    { label: "Week 4", value: 4.2 },
-  ],
-};
-
 export function InventoryTurnover() {
-  const { filters, loading } = useAnalytics();
-  const [data, setData] = useState<InventoryTurnoverData | null>(null);
-  const [isLocalLoading, setIsLocalLoading] = useState(true);
+  const { data: analyticsData, loading } = useAnalytics();
+  const data = analyticsData.inventoryTurnover;
 
-  // Simulate fetching data based on filters
-  useEffect(() => {
-    setIsLocalLoading(true);
-    // Simulate network delay
-    const timer = setTimeout(() => {
-      // TODO: Replace this mock implementation with an actual API call or Supabase query
-      // using the provided filters (e.g., dateRange, category) when the backend is ready.
-      setData(MOCK_TURNOVER_DATA);
-      setIsLocalLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [filters]);
-
-  if (loading || isLocalLoading) {
+  if (loading) {
     return (
       <Card className="shadow-sm col-span-full lg:col-span-1 h-[420px] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
@@ -90,7 +42,7 @@ export function InventoryTurnover() {
   const formatCurrency = (val: number) => `₱${val.toLocaleString()}`;
 
   // Trend calculations
-  const changePercent = data.previousPeriodTurnover 
+  const changePercent = data.previousPeriodTurnover && data.turnoverRate !== null
     ? ((data.turnoverRate - data.previousPeriodTurnover) / data.previousPeriodTurnover) * 100 
     : null;
     
@@ -180,14 +132,22 @@ export function InventoryTurnover() {
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col justify-between pt-2 pb-5">
+        {data.missingCostCount > 0 && (
+          <div className="mb-4 flex items-start gap-2 p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 rounded-md text-xs">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <p>
+              {data.missingCostCount} ingredient(s) missing unit cost. The estimated COGS and inventory values below are incomplete.
+            </p>
+          </div>
+        )}
         <div>
           <div className="grid grid-cols-2 gap-4 mb-5">
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Turnover Rate</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold">{data.turnoverRate.toFixed(1)}×</span>
+                <span className="text-2xl font-bold">{data.turnoverRate !== null ? `${data.turnoverRate.toFixed(1)}×` : '—'}</span>
               </div>
-              {changePercent !== null && trendDirection !== null && (
+              {changePercent !== null && trendDirection !== null && data.turnoverRate !== null && (
                 <p className={`text-xs font-medium flex items-center mt-1 ${trendDirection === "up" ? "text-emerald-600" : trendDirection === "down" ? "text-red-600" : "text-muted-foreground"}`}>
                   {trendDirection === "up" && <TrendingUp className="h-3 w-3 mr-1" />}
                   {trendDirection === "down" && <TrendingDown className="h-3 w-3 mr-1" />}
@@ -199,8 +159,8 @@ export function InventoryTurnover() {
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Days in Inventory</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold">{data.inventoryDays.toFixed(1)}</span>
-                <span className="text-sm font-normal text-muted-foreground">days</span>
+                <span className="text-2xl font-bold">{data.daysInInventory !== null ? data.daysInInventory.toFixed(1) : '—'}</span>
+                {data.daysInInventory !== null && <span className="text-sm font-normal text-muted-foreground">days</span>}
               </div>
             </div>
           </div>

@@ -138,7 +138,7 @@ export default function InventoryPage() {
             currentStock: row.current_stock,
             maxCapacity: row.max_capacity,
             lowStockThreshold: row.low_stock_threshold,
-            unitCost: row.name.toLowerCase().includes('tea') ? 12.00 : row.name.toLowerCase().includes('arabica') ? 0.85 : 5.50, // Mock frontend-only cost
+            unitCost: row.unit_cost ?? undefined,
             imageUrl: row.image_url,
             notes: row.notes,
             createdAt: row.created_at,
@@ -425,6 +425,7 @@ export default function InventoryPage() {
           low_stock_threshold: ingredientData.lowStockThreshold,
           image_url: ingredientData.imageUrl ?? null,
           notes: ingredientData.notes ?? null,
+          unit_cost: ingredientData.unitCost ?? null,
         })
         .eq("id", selectedItem.id)
         .select()
@@ -503,6 +504,7 @@ export default function InventoryPage() {
           low_stock_threshold: ingredientData.lowStockThreshold,
           image_url: ingredientData.imageUrl ?? null,
           notes: ingredientData.notes ?? null,
+          unit_cost: ingredientData.unitCost ?? null,
         })
         .select()
         .single();

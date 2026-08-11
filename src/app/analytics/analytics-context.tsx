@@ -77,6 +77,22 @@ export interface InventoryConsumption {
   total_consumed: number;
 }
 
+export interface InventoryTurnoverData {
+  turnoverRate: number | null;
+  daysInInventory: number | null;
+  estimatedCogs: number;
+  averageInventory: number;
+  beginningInventory: number;
+  endingInventory: number;
+  previousPeriodTurnover: number | null;
+  changePercent: number | null;
+  missingCostCount: number;
+  trend: {
+    label: string;
+    value: number;
+  }[];
+}
+
 export interface AnalyticsData {
   kpis: KpiData | null;
   revenue: RevenuePeriod[];
@@ -89,6 +105,7 @@ export interface AnalyticsData {
   voidAnalysis: VoidAnalysis | null;
   mostConsumed: InventoryConsumption[];
   leastConsumed: InventoryConsumption[];
+  inventoryTurnover: InventoryTurnoverData | null;
 }
 
 export interface AnalyticsContextType {
@@ -122,6 +139,7 @@ const emptyData: AnalyticsData = {
   voidAnalysis: null,
   mostConsumed: [],
   leastConsumed: [],
+  inventoryTurnover: null,
 };
 
 const AnalyticsContext = createContext<AnalyticsContextType | null>(null);
@@ -216,6 +234,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         voidRes,
         mostConsumedRes,
         leastConsumedRes,
+        inventoryTurnoverRes,
       ] = await Promise.all([
         supabase.rpc("get_analytics_kpis", filterParams),
         supabase.rpc("get_revenue_by_period", filterParams),
@@ -228,6 +247,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         supabase.rpc("get_void_analysis", filterParams),
         supabase.rpc("get_inventory_consumption", { p_date_from: dateFrom, p_date_to: dateTo, p_direction: "most", p_limit: 4 }),
         supabase.rpc("get_inventory_consumption", { p_date_from: dateFrom, p_date_to: dateTo, p_direction: "least", p_limit: 4 }),
+        supabase.rpc("get_inventory_turnover", { p_date_from: dateFrom, p_date_to: dateTo }),
       ]);
 
       setData({
@@ -242,6 +262,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         voidAnalysis: voidRes.data ?? null,
         mostConsumed: mostConsumedRes.data ?? [],
         leastConsumed: leastConsumedRes.data ?? [],
+        inventoryTurnover: inventoryTurnoverRes.data ?? null,
       });
     } catch (err) {
       console.error("Analytics fetch error:", err);
