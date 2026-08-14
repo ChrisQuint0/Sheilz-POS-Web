@@ -128,6 +128,18 @@ const chartOptions = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function isErrorObj(err: any): boolean {
+  if (!err) return false;
+  if (typeof err !== "object") return true;
+  if (err instanceof Error) return true;
+  try {
+    if (JSON.stringify(err) === "{}") return false;
+  } catch (e) {
+    // Ignore serialization errors
+  }
+  return Object.keys(err).length > 0 || !!err.message;
+}
+
 function stockSeverity(stock: number, threshold: number) {
   const ratio = stock / threshold;
   if (ratio <= 0.25) return "critical";
@@ -222,22 +234,26 @@ export default function Dashboard() {
     setTrendLoading(true);
     const supabase = createClient();
     try {
-      const [trendRes, kpisRes] = await Promise.all([
+      let [trendRes, kpisRes] = await Promise.all([
         supabase.rpc("get_dashboard_revenue_trend", { p_day_offset: offset }),
-        offset === 0 
-          ? supabase.rpc("get_dashboard_kpis") 
-          : supabase.rpc("get_dashboard_kpis", { p_day_offset: offset }),
+        supabase.rpc("get_dashboard_kpis", { p_day_offset: offset }),
       ]);
       
+      if (offset === 0 && kpisRes.error && kpisRes.error.code === 'PGRST202') {
+        kpisRes = await supabase.rpc("get_dashboard_kpis");
+      }
+      
       if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
-      if (trendRes.error) console.error("Revenue trend error:", trendRes.error);
+      if (isErrorObj(trendRes.error)) console.error("Revenue trend error:", trendRes.error);
+
+      const hasKpisError = isErrorObj(kpisRes.error);
 
       // If the RPC call succeeded (meaning the backend migration is applied or offset is 0)
-      if (!kpisRes.error && kpisRes.data) {
+      if (!hasKpisError && kpisRes.data) {
         setKpis(kpisRes.data as DashboardKpis);
       } 
       // Fallback: If the migration hasn't been deployed yet, compute KPIs in the frontend for offset !== 0
-      else if (kpisRes.error && offset !== 0) {
+      else if (hasKpisError && offset !== 0) {
         console.warn("RPC get_dashboard_kpis with offset failed, falling back to frontend computation.");
         
         // Calculate Manila midnight timestamps for the week boundaries
@@ -310,7 +326,7 @@ export default function Dashboard() {
           orders_change: Number(ordersChange.toFixed(1)),
           aov_change: Number(aovChange.toFixed(1)),
         });
-      } else if (kpisRes.error) {
+      } else if (hasKpisError) {
         console.error("KPIs error:", kpisRes.error);
       }
     } catch (err) {
@@ -325,9 +341,9 @@ export default function Dashboard() {
     const supabase = createClient();
 
     try {
-      const [kpisRes, trendRes, lowStockRes, alertCountRes, activityRes] =
+      let [kpisRes, trendRes, lowStockRes, alertCountRes, activityRes] =
         await Promise.all([
-          supabase.rpc("get_dashboard_kpis"),
+          supabase.rpc("get_dashboard_kpis", { p_day_offset: 0 }),
           supabase.rpc("get_dashboard_revenue_trend", { p_day_offset: 0 }),
           supabase.rpc("get_low_stock_items", { p_limit: 3 }),
           supabase.rpc("get_stock_alert_count"),
@@ -340,6 +356,10 @@ export default function Dashboard() {
             .limit(5),
         ]);
 
+      if (kpisRes.error && kpisRes.error.code === 'PGRST202') {
+        kpisRes = await supabase.rpc("get_dashboard_kpis");
+      }
+
       if (kpisRes.data) setKpis(kpisRes.data as DashboardKpis);
       if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
       if (lowStockRes.data) setLowStockItems(lowStockRes.data as LowStockItem[]);
@@ -348,11 +368,11 @@ export default function Dashboard() {
       if (activityRes.data) setRecentActivity(activityRes.data as AuditLogEntry[]);
 
       // Log errors for debugging
-      if (kpisRes.error) console.error("KPIs error:", kpisRes.error);
-      if (trendRes.error) console.error("Revenue trend error:", trendRes.error);
-      if (lowStockRes.error) console.error("Low stock error:", lowStockRes.error);
-      if (alertCountRes.error) console.error("Alert count error:", alertCountRes.error);
-      if (activityRes.error) console.error("Activity error:", activityRes.error);
+      if (isErrorObj(kpisRes.error)) console.error("KPIs error:", kpisRes.error);
+      if (isErrorObj(trendRes.error)) console.error("Revenue trend error:", trendRes.error);
+      if (isErrorObj(lowStockRes.error)) console.error("Low stock error:", lowStockRes.error);
+      if (isErrorObj(alertCountRes.error)) console.error("Alert count error:", alertCountRes.error);
+      if (isErrorObj(activityRes.error)) console.error("Activity error:", activityRes.error);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
     } finally {
