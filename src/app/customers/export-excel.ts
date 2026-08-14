@@ -199,9 +199,9 @@ export const exportCustomersToExcel = async (options: ExportOptions) => {
   ws1.addConditionalFormatting({
     ref: `F12:F${startRow + customers.length}`,
     rules: [
-      { type: 'cellIs', operator: 'greaterThanOrEqual', formulae: ['0.8'], style: { font: { color: { argb: '166534' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'DCFCE7' } } } }, // Green >= 80%
-      { type: 'cellIs', operator: 'between', formulae: ['0.5', '0.799'], style: { font: { color: { argb: '9A3412' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFEDD5' } } } }, // Orange 50-79%
-      { type: 'cellIs', operator: 'lessThan', formulae: ['0.5'], style: { font: { color: { argb: '991B1B' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FEE2E2' } } } } // Red < 50%
+      { type: 'cellIs', priority: 1, operator: 'greaterThan', formulae: ['0.799'], style: { font: { color: { argb: '166534' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'DCFCE7' } } } }, // Green >= 80%
+      { type: 'cellIs', priority: 2, operator: 'between', formulae: ['0.5', '0.799'], style: { font: { color: { argb: '9A3412' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFEDD5' } } } }, // Orange 50-79%
+      { type: 'cellIs', priority: 3, operator: 'lessThan', formulae: ['0.5'], style: { font: { color: { argb: '991B1B' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FEE2E2' } } } } // Red < 50%
     ]
   });
 
@@ -209,8 +209,8 @@ export const exportCustomersToExcel = async (options: ExportOptions) => {
   ws1.addConditionalFormatting({
     ref: `H12:H${startRow + customers.length}`,
     rules: [
-      { type: 'containsText', operator: 'containsText', text: 'Active', style: { font: { color: { argb: '166534' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'DCFCE7' } } } },
-      { type: 'containsText', operator: 'containsText', text: 'Inactive', style: { font: { color: { argb: '1F2937' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'F3F4F6' } } } }
+      { type: 'containsText', priority: 4, operator: 'containsText', text: 'Active', style: { font: { color: { argb: '166534' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'DCFCE7' } } } },
+      { type: 'containsText', priority: 5, operator: 'containsText', text: 'Inactive', style: { font: { color: { argb: '1F2937' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'F3F4F6' } } } }
     ]
   });
 
