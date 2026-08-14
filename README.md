@@ -1,148 +1,224 @@
-# Sheilz POS Web — Admin & Backoffice Dashboard
+# ☕ Sheilz POS Web — Admin & Backoffice Dashboard
 
-A premium web-based administration and business intelligence dashboard built with Next.js for Sheilz Coffee. This web application serves as the back-office command center, complementing the Sheilz POS Mobile terminal. Both platforms synchronize in real time using Supabase for cloud storage, ensuring centralized tracking of orders, stock levels, and staff operations.
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.9-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19.2.4-61DAFB?style=flat-square&logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Database_%26_Auth-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-AI_Assistant-8E75B2?style=flat-square&logo=googlegemini)](https://ai.google.dev)
 
-For the detailed screen-by-screen system specs, refer to [USER_FLOWS.md](file:///d:/Code/Shielz-POS-Web/sheilz-pos-web/USER_FLOWS.md).
-
----
-
-## Key Modules & Features
-
-### Dashboard & Basic Analytics
-
-- **Daily KPIs**: Real-time trackers for Total Revenue, Orders Today, Average Order Value (AOV), and Stock Alerts, with trend indicators comparing performance against the previous day.
-- **Weekly Trends**: A quick-view chart displaying the sales revenue trend over the week.
-- **Recent Activity**: A rolling feed showcasing critical system operations (e.g., stock changes, logins, or configuration edits).
-- **Low Stock Warning**: Highlights the 3 most critical low-stock ingredients for immediate replenishment.
-
-### POS Configuration (POS Settings)
-
-- **Product Catalog**: Centralized view of all menu items. Admins can click any product to modify pricing, description, category, size, or temperature availability in the Edit Product Modal.
-- **Global Parameters**: A drag-and-drop ordering interface to organize product categories, payment options, sizes, and temperature chips.
-- **Product Configurator**: A multi-step flow for adding new products:
-  1. Upload product thumbnail images directly to Supabase storage.
-  2. Input basic name, description, category, and type (Beverage vs. Pastry).
-  3. Toggle size availability and temperature settings (automatically skipped for pastries).
-  4. Link ingredients and specify exact ingredient gram/mL amounts for automatic stock deduction (Recipe Configuration).
-  5. Toggle active POS availability.
-
-### Sales History & Transaction Ledger
-
-- **Interactive Data Table**: Powered by AG Grid React on desktop for high-performance sorting, column resizing, filtering, and bulk deletions. Adapts to responsive, touch-friendly cards on mobile.
-- **Granular Filters**: Filter by status (Completed, Voided), payment method (Cash, GCash, Maya, BPI), cashier name, or search query.
-- **Manual Entry & Auditing**: Manually record transactions or open the transaction detail drawer to inspect cashier, payment, item subtotals, and modification logs.
-- **Manager Authorization**: Deletion or adjustments to sales records are password-protected via the Authorization Modal.
-- **Exports**: Instant file downloads to Excel (`.xlsx`) sheet format matching current filter states.
-
-### Inventory & Stock Control
-
-- **Dual-View Ledger**: Toggle between Stock Management (ingredient catalog cards) and the Transactions Ledger (audit logs of all movements).
-- **Alert Statuses**: Color-coded stock level gauges (Green/Healthy, Orange/Low, Red/Critical, Black/Out of stock).
-- **Automatic Deduction**: Synced mobile sales automatically deduct raw ingredients based on the configured recipes.
-- **Manual Adjustment**: Log spoilage, waste, and manual adjustments.
-- **Replenishment System**: Log item intakes, update current stock levels, specify supplier/delivery costs, and record expense payment methods.
-- **Exports**: Save inventory stock status or transaction ledgers to CSV files.
-
-### Team & Staff Access Control (RBAC)
-
-- **Staff Roster**: Manage account status (Active, Inactive) and edit display names or emails.
-- **Role-Based Access Control**: Assign roles (Administrator, Manager, Cashier) to enforce access permissions.
-- **Account Provisioning**: Add staff accounts manually or import users in bulk via a formatted CSV/Excel template.
-- **Security Controls**: Direct password resets for staff members losing credentials.
-
-### Immutable Audit Logs
-
-- **Security Feeds**: Chronological timeline tracking system events (logins, logouts, database updates, adjustments).
-- **Metadata Collection**: Logs the specific user, action type, target ID, client IP address, and browser User Agent.
-- **Payload Viewer**: Inspect detailed before-and-after JSON state changes to trace modifications.
-- **Dynamic Search & Export**: Filter by action types, dates, or severity levels and export to Excel/CSV.
-
-### Business Intelligence (Analytics)
-
-- **Sales Analytics**: Deep-dive charts tracking revenue trends over custom ranges.
-- **Category Breakdown**: Product category revenue shares represented via interactive donut charts.
-- **Performance Leaderboards**: Tracks top-selling drinks/pastries by quantity sold and revenue generated.
-- **Heatmaps**: Identifies peak business hours and peak days to schedule staff efficiently.
-- **Ingredient Turnover**: Lists the most consumed and least consumed ingredients to aid procurement and minimize waste.
-- **Exports**: Raw analytics numbers are exportable to Excel (`.xlsx`), while visual charts can be exported to a polished PDF report document.
+A premium, enterprise-grade web administration and business intelligence dashboard built for **Sheilz Coffee**. Serving as the back-office command center, **Sheilz POS Web** operates in real-time synergy with the **Sheilz POS Mobile** terminal via Supabase cloud infrastructure. It centralizes sales tracking, multi-recipe inventory management, role-based staff provisioning, AI-powered business analytics, immutable audit logs, and system diagnostics.
 
 ---
 
-## Technology Stack
+## 🌟 Key Features & Modules
 
-- **Core Framework**: [Next.js 16 (App Router)](https://nextjs.org) with [React 19](https://react.dev)
-- **Language**: [TypeScript](https://www.typescriptlang.org)
-- **Styling & UI**: [Tailwind CSS 4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com), and custom vanilla CSS variables for a premium, unified theme
-- **Database & Auth**: [Supabase JS Client](https://supabase.com)
-- **Advanced Tables**: [AG Grid Community](https://www.ag-grid.com) (Quartz theme)
-- **Charts Engine**: [Chart.js](https://www.chartjs.org) via [react-chartjs-2](https://react-chartjs-2.js.org)
-- **Export Libraries**: [SheetJS (XLSX)](https://sheetjs.com) for spreadsheet reporting, [jsPDF](https://github.com/parallax/jsPDF) & [html2canvas](https://html2canvas.hertzen.com) for visual PDF compiles
+### 📊 1. Executive Dashboard & Real-Time KPIs
+
+- **Live Metrics Cards**: Immediate tracking of **Total Revenue**, **Orders Today**, **Average Order Value (AOV)**, and **Stock Alerts**, complete with trend indicators comparing performance to historical baselines.
+- **Weekly Revenue Trends**: Dynamic visual chart showing 7-day revenue performance.
+- **Rolling Activity Stream**: Real-time event log tracking system actions (logins, stock changes, configuration updates).
+- **Critical Inventory Highlights**: Direct visibility into top low-stock ingredients requiring immediate reordering.
+
+### 🤖 2. Sheilz AI Assistant (Powered by Google Gemini)
+
+- **Built-in Intelligent Copilot**: Integrated widget utilizing Google Gemini API with custom RAG (Retrieval-Augmented Generation) knowledge base integration.
+- **Operational & Sales Insights**: Query business trends, inventory turnover, peak transaction hours, and menu suggestions using natural language.
+- **Troubleshooting Support**: Instant assistance for staff on workflow execution, recipe setup, and system diagnostics.
+
+### ⚙️ 3. POS Configuration & Recipe Management
+
+- **Catalog Management**: Centralized management of beverages and pastries. Modify pricing, category, description, size, and temperature parameters.
+- **Dynamic Category & Payment Ordering**: Drag-and-drop hierarchy customization for categories, payment methods, sizes, and temperature chips on POS terminals.
+- **Multi-Step Product Wizard**:
+  1. Upload product thumbnail media directly to Supabase Storage.
+  2. Define name, description, category, and item type (Beverage vs. Pastry).
+  3. Configure size and temperature availability (automatically bypasses temperature for pastries).
+  4. **Recipe Configurator**: Map exact ingredient gram/mL amounts per size variant for automated sales-driven stock deduction.
+  5. Toggle active terminal availability.
+
+### 🛒 4. Sales History & Transaction Ledger
+
+- **High-Performance Data Grid**: Powered by **AG Grid React (Quartz Theme)** with column sorting, resizing, filtering, and bulk operations. Responsive card view fallback for mobile viewports.
+- **Granular Filtering**: Filter transactions by status (_Completed_, _Voided_), payment method (_Cash_, _GCash_, _Maya_, _BPI_), cashier, or text search.
+- **Transaction Inspector Drawer**: Complete breakdown of sold items, size variants, custom modifiers, payment breakdowns, and exact timestamp logs.
+- **Manager Authorization Modal**: Security barrier requiring high-privilege credentials to authorize deletions or record adjustments.
+- **One-Click Data Export**: Download transaction sets directly to Microsoft Excel (`.xlsx`).
+
+### 📦 5. Inventory & Stock Control
+
+- **Dual-View Ledger**: Seamlessly toggle between **Stock Management** (ingredient cards with visual gauges) and **Movement Audit Ledger** (log of all stock adjustments).
+- **Visual Alert Thresholds**: Color-coded stock status indicators (_Healthy / Green_, _Low / Orange_, _Critical / Red_, _Out of Stock / Black_).
+- **Automated Deduction Engine**: Real-time deduction of raw coffee beans, milk, syrups, and packaging based on sales recipe mappings.
+- **Manual Adjustments**: Record spoilage, damage, internal consumption, or physical count reconciliation.
+- **Intake & Replenishment**: Log incoming inventory batches, update stock levels, input supplier unit costs, and track payment source.
+- **CSV Ledger Export**: Export inventory stock status and movement logs to CSV format.
+
+### 👥 6. Customer CRM & Loyalty Analytics
+
+- **Customer Database**: Centralized customer profile repository.
+- **Purchasing Insights**: Track purchase history, customer lifetime value (LTV), and frequency patterns.
+- **Exporting Capabilities**: Export customer lists and segmentation data to Excel format.
+
+### 🔐 7. Team & Staff Management (RBAC)
+
+- **Role-Based Access Control (RBAC)**: Assign strict permissions for _Administrator_, _Manager_, and _Cashier_ roles.
+- **Staff Roster**: Manage status (_Active_, _Inactive_), update display names, and control email assignments.
+- **Bulk Account Provisioning**: Add staff accounts individually or import user lists via formatted CSV/Excel spreadsheets.
+- **Credential Recovery**: Administrator-driven password reset functionality for team members.
+
+### 🛡️ 8. Immutable Audit Logs & Security
+
+- **Event Audit Feed**: Comprehensive chronological audit trail capturing all system events.
+- **Rich Metadata Collection**: Logs initiating user, action type, target resource ID, client IP address, and browser User Agent parsing.
+- **JSON Payload Diff Viewer**: Side-by-side inspection of before-and-after state payloads for data modifications.
+- **Audit Search & Filter**: Filter by severity level, action category, or date range with Excel/CSV export capabilities.
+
+### 🩺 9. System Diagnostics & Health Monitor
+
+- **Health Overview**: System-wide status indicator for API endpoints, Supabase connections, and background workers.
+- **Database Health Monitor**: Real-time DB performance monitoring, table stats, and RPC execution status.
+- **Query Performance & Error Logs**: Insights into database query response times, warning centers, and application error logs.
+
+### 📈 10. Advanced Business Intelligence & PDF Reporting
+
+- **Interactive Visualizations**: Powered by **Chart.js** & **react-chartjs-2**.
+- **Revenue Analytics**: Custom date range trend analysis.
+- **Category Share Breakdown**: Donut charts illustrating revenue allocation across menu categories.
+- **Top Product Leaderboards**: Ranking top menu items by volume sold and revenue generated.
+- **Hourly & Daily Heatmaps**: Peak operational hour matrices to optimize shift scheduling.
+- **Ingredient Turnover Matrix**: High/low ingredient consumption ratios for smarter purchasing.
+- **Export Engine**: Export raw datasets to Excel (`.xlsx`) or generate camera-ready graphical PDF executive reports (`jsPDF` & `html2canvas`).
 
 ---
 
-## Project Setup & Configuration
+## 🛠️ Technology Stack
+
+| Domain              | Technology / Library                                                                        | Purpose                                                       |
+| :------------------ | :------------------------------------------------------------------------------------------ | :------------------------------------------------------------ |
+| **Core Framework**  | [Next.js 16 (App Router)](https://nextjs.org)                                               | Full-stack React framework with SSR and App Router            |
+| **UI Library**      | [React 19](https://react.dev)                                                               | Frontend component library                                    |
+| **Language**        | [TypeScript 5](https://www.typescriptlang.org)                                              | Type-safe JavaScript superset                                 |
+| **Styling & Theme** | [Tailwind CSS 4](https://tailwindcss.com), `shadcn/ui`, `tw-animate-css`                    | Utility-first styling with modern design tokens               |
+| **Database & Auth** | [Supabase Client & SSR](https://supabase.com)                                               | PostgreSQL database, RLS security, storage, and auth          |
+| **AI Engine**       | [@google/genai](https://ai.google.dev)                                                      | Google Gemini API integration with custom RAG KB              |
+| **Data Tables**     | [AG Grid Community 35](https://www.ag-grid.com)                                             | Desktop-grade data table with Quartz theme                    |
+| **Charts & Graphs** | [Chart.js 4](https://www.chartjs.org) & [react-chartjs-2](https://react-chartjs-2.js.org)   | Interactive analytics visualizations                          |
+| **Excel Export**    | [ExcelJS](https://github.com/exceljs/exceljs) & [SheetJS (XLSX)](https://sheetjs.com)       | Custom styled Excel spreadsheet generator                     |
+| **PDF Reporting**   | [jsPDF](https://github.com/parallax/jsPDF) & [html2canvas](https://html2canvas.hertzen.com) | PDF rendering for executive reporting                         |
+| **Utilities**       | `date-fns`, `ua-parser-js`, `lucide-react`, `sonner`                                        | Date handling, device parsing, icons, and toast notifications |
+
+---
+
+## 📁 Directory Structure
+
+```text
+sheilz-pos-web/
+├── src/
+│   ├── app/                      # Next.js App Router Pages & API Routes
+│   │   ├── analytics/            # Business Intelligence charts, KPI metrics, PDF export
+│   │   ├── api/                  # Backend API routes
+│   │   │   ├── ai/chat/          # Gemini AI chat endpoint with RAG context
+│   │   │   └── export-sales/     # Sales export endpoints
+│   │   ├── audit/                # Immutable audit logs, JSON diff viewer, exports
+│   │   ├── customers/            # Customer CRM database & purchasing analytics
+│   │   ├── dashboard/            # Executive overview dashboard & live KPI widgets
+│   │   ├── diagnostics/          # System health, DB query performance & error logs
+│   │   ├── inventory/            # Ingredient cards, movement ledger & intake logs
+│   │   ├── login/                # Administrator secure authentication
+│   │   ├── pos-settings/         # Menu catalog, recipe configurer & drag-drop ordering
+│   │   ├── sales/                # Transaction ledger (AG Grid), detail drawers, authorization
+│   │   ├── team/                 # Staff RBAC, user status, bulk CSV/Excel import
+│   │   ├── globals.css           # Tailwind CSS 4 setup & custom CSS variables
+│   │   ├── layout.tsx            # Global application shell with Sidebar & Header
+│   │   └── page.tsx              # Root entry route
+│   ├── components/               # Reusable Application Components
+│   │   ├── layout/               # Header, sidebar, and breadcrumb layout components
+│   │   ├── sheilz-ai/            # Gemini AI chatbot drawer, floating button, and context
+│   │   └── ui/                   # shadcn baseline UI primitives (buttons, dialogs, inputs)
+│   ├── hooks/                    # Custom React hooks (e.g. useMediaQuery, profile hooks)
+│   └── lib/                      # Infrastructure & Core Helpers
+│       ├── ai/                   # Gemini client initialization, prompt templates, RAG loader
+│       ├── pdf-export.ts         # High-resolution canvas to PDF report compiler
+│       └── utils.ts              # Helper utility functions
+├── supabase/
+│   ├── config.toml               # Supabase CLI local configuration
+│   └── migrations/               # PostgreSQL schema, RLS policies, RPC functions & seeds
+├── public/                       # Static public assets and branding imagery
+├── USER_FLOWS.md                 # Detailed feature breakdown and screen flow specifications
+└── package.json                  # Dependencies, scripts, and build configuration
+```
+
+---
+
+## ⚡ Quick Start & Installation
 
 ### Prerequisites
 
-- **Node.js** v20+
-- **npm** v10+
+Ensure you have the following installed on your development machine:
 
-### 1. Installation
+- **Node.js**: `v20.0.0` or higher
+- **npm**: `v10.0.0` or higher
 
-Clone the repository and install the project dependencies:
+### 1. Clone & Install Dependencies
 
 ```bash
+git clone https://github.com/ChrisQuint0/Sheilz-POS-Web.git
+cd sheilz-pos-web
 npm install
 ```
 
-### 2. Environment Setup
+### 2. Environment Configuration
 
-Create a `.env.local` file in the root directory and add your Supabase credentials:
+Create a `.env.local` file in the root directory:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+
+# Google Gemini AI Integration
+GEMINI_API_KEY=your-google-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-### 3. Running the Development Server
+### 3. Run Development Server
 
-Launch the Next.js development server:
+Start the local development server:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the dashboard.
+Navigate to `http://localhost:3000` in your web browser.
 
 ### 4. Build for Production
 
-To bundle the web app for deployment:
+To create an optimized production build:
 
 ```bash
 npm run build
 npm run start
 ```
 
+To run lint checks across the codebase:
+
+```bash
+npm run lint
+```
+
 ---
 
-## Project Structure
+## 🔒 Security & Data Integrity
 
-```text
-src/
-├── app/                  # Next.js App Router folders
-│   ├── analytics/        # Business Intelligence graphs, KPI metrics, PDF exports
-│   ├── audit/            # Action monitoring, JSON payload diff drawers, CSV exports
-│   ├── dashboard/        # Main landing widgets, summary metrics cards, week overview
-│   ├── inventory/        # Ingredient cards, Replenishment logs, category toggles
-│   ├── login/            # Administrator secure login screen
-│   ├── pos-settings/     # Product grid list, category sorting, recipe setups
-│   ├── sales/            # Transaction grid list, transaction breakdown drawers
-│   ├── team/             # RBAC controls, account status management, user imports
-│   ├── globals.css       # Core Tailwind & custom variables design guidelines
-│   ├── layout.tsx        # Global shell including Sidebar and Header navigation
-│   └── page.tsx          # Initial entry router redirection
-├── components/           # Shared UI components (Modals, Custom select, drawers)
-│   └── ui/               # shadcn baseline components (button, input, badge)
-├── hooks/                # Custom React hooks (e.g. useMediaQuery)
-└── lib/                  # Library initializers (Supabase setup, helper utilities)
-```
+- **Row Level Security (RLS)**: Enforced across all Supabase PostgreSQL tables to guarantee that tenant data is isolated and staff privileges are verified at the database layer.
+- **Elevated Privilege Verification**: Voids, sales record deletions, and major stock adjustments require high-level Manager / Admin re-authentication.
+- **Auditability**: IP tracking, user-agent parsing, and before-and-after JSON snapshots ensure transparency and fraud prevention.
+
+---
+
+## 📄 License & Credits
+
+Designed and developed exclusively for **Sheilz Coffee**.  
+All rights reserved © 2026.
