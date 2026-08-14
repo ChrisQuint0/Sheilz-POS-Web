@@ -403,7 +403,7 @@ export default function CustomerManagementPage() {
             >
               Status
             </Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? "All")}>
               <SelectTrigger id="status-filter" className="w-[140px] bg-background">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -478,7 +478,7 @@ export default function CustomerManagementPage() {
 
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Reward</Label>
-              <Select value={settings.reward} onValueChange={(val) => setSettings({...settings, reward: val})}>
+              <Select value={settings.reward} onValueChange={(val) => setSettings({...settings, reward: val ?? ""})}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
                 </SelectTrigger>
