@@ -28,18 +28,55 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Last message must be from user.' }, { status: 400 });
     }
 
-    // Call the Gemini API
-    const response = await geminiClient.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [
-        ...history,
-        { role: 'user', parts: [{ text: lastMessage.content }] }
-      ],
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.2, // Low temperature for factual responses
+    // Call the Gemini API with fallback mechanism for rate limits
+    let response;
+    const fallbackModels = ['gemini-2.5-flash', 'gemini-3.5-flash-8b', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    
+    // Ensure we start with the configured model and don't duplicate it in fallbacks
+    const modelsToTry = [GEMINI_MODEL, ...fallbackModels.filter(m => m !== GEMINI_MODEL)];
+    let lastError: any = null;
+
+    for (const model of modelsToTry) {
+      try {
+        response = await geminiClient.models.generateContent({
+          model: model,
+          contents: [
+            ...history,
+            { role: 'user', parts: [{ text: lastMessage.content }] }
+          ],
+          config: {
+            systemInstruction: systemInstruction,
+            temperature: 0.2,
+          }
+        });
+        
+        // If successful, exit the loop
+        break;
+      } catch (e: any) {
+        lastError = e;
+        
+        const errorMessage = e.message?.toLowerCase() || '';
+        const status = e.status || '';
+        
+        // Check for 429 Resource Exhausted / Quota Limit
+        if (
+          errorMessage.includes('quota') || 
+          errorMessage.includes('429') || 
+          status === 'RESOURCE_EXHAUSTED' || 
+          status === 429
+        ) {
+          console.warn(`[Sheilz AI] Rate limit exceeded for model ${model}. Trying fallback...`);
+          continue; // Try the next model
+        } else {
+          // If it's a different error (e.g. invalid key), throw it immediately
+          throw e;
+        }
       }
-    });
+    }
+
+    if (!response) {
+      throw lastError || new Error("All fallback models failed.");
+    }
 
     return NextResponse.json({
       role: 'assistant',
