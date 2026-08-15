@@ -18,6 +18,7 @@ export function SheilzAIButton() {
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2">
       <Tooltip>
         <TooltipTrigger
+          id="sheilz-ai-toggle-button"
           onClick={toggleChat}
           className={cn(
             "relative flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
@@ -47,7 +48,7 @@ export function SheilzAIButton() {
           )}
         </TooltipTrigger>
         {!isChatOpen && (
-          <TooltipContent side="left" className="font-medium bg-primary text-primary-foreground border-none shadow-md">
+          <TooltipContent side="left" hideArrow className="font-medium bg-primary text-primary-foreground border-none shadow-md">
             Ask Sheilz AI
           </TooltipContent>
         )}
