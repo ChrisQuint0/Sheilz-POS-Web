@@ -157,7 +157,9 @@ export default function SalesHistoryPage() {
                 name,
                 quantity,
                 size,
-                temperature
+                temperature,
+                unit_price,
+                subtotal
               )
             `,
             )

@@ -71,17 +71,40 @@ export function DigitalReceiptModal({
     setStep(2);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     setIsSending(true);
     
-    // Simulate frontend-only send
-    setTimeout(() => {
-      setIsSending(false);
-      toast.success("Receipt prepared successfully", {
-        description: `The receipt is ready to be sent to ${email}.`,
+    try {
+      const response = await fetch('/api/send-receipt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          customerName,
+          transaction
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send receipt');
+      }
+
+      toast.success("Receipt sent successfully", {
+        description: `The receipt has been sent to ${email}.`,
       });
       onClose();
-    }, 1500);
+    } catch (error) {
+      console.error("Error sending receipt:", error);
+      toast.error("Failed to send receipt", {
+        description: error instanceof Error ? error.message : "Please check your configuration or try again.",
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
