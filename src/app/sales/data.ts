@@ -25,5 +25,9 @@ export interface Transaction {
   createdBy: string;
   lastModifiedBy?: string;
   lastModifiedAt?: string;
+
+  // Payment Details (Frontend Preparation)
+  cashTendered?: number;
+  changeAmount?: number;
 }
 
