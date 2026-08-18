@@ -195,6 +195,8 @@ export default function SalesHistoryPage() {
             amount: order.amount,
             paymentMethod: order.payment_method,
             cashier: order.cashier_name,
+            cashTendered: order.cash_tendered,
+            changeAmount: order.change_amount,
             createdBy: order.created_by ?? currentUser,
             createdAt: order.created_at,
             lastModifiedBy: order.last_modified_by ?? "",
@@ -589,6 +591,18 @@ export default function SalesHistoryPage() {
         field: "amount",
         headerName: "Amount",
         valueFormatter: (params) => `₱${params.value?.toFixed(2)}`,
+        minWidth: 120,
+      },
+      {
+        field: "cashTendered",
+        headerName: "Cash Tendered",
+        valueFormatter: (params) => params.value != null ? `₱${params.value?.toFixed(2)}` : "-",
+        minWidth: 140,
+      },
+      {
+        field: "changeAmount",
+        headerName: "Change",
+        valueFormatter: (params) => params.value != null ? `₱${params.value?.toFixed(2)}` : "-",
         minWidth: 120,
       },
       {

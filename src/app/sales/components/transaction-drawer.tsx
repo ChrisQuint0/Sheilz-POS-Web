@@ -241,6 +241,16 @@ export function TransactionDrawer({
                 <div className="text-right font-bold text-lg mt-1 text-primary">
                   ₱{transaction.amount.toFixed(2)}
                 </div>
+
+                <div className="text-muted-foreground mt-2">Cash Tendered</div>
+                <div className="text-right mt-2">
+                  ₱{(transaction.cashTendered || 0).toFixed(2)}
+                </div>
+
+                <div className="text-muted-foreground">Change</div>
+                <div className="text-right">
+                  ₱{(transaction.changeAmount || 0).toFixed(2)}
+                </div>
               </div>
             </section>
 
