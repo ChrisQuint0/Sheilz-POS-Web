@@ -69,9 +69,7 @@ export const exportCustomersToExcel = async (options: ExportOptions) => {
     : 0;
   
   const readyToRedeem = customers.filter(c => c.currentStamps >= settings.purchasesRequired).length;
-  const totalRedeemed = customers.reduce((acc, c) => {
-    return acc + c.recentActivity.filter(a => a.action.includes("Redeemed")).length;
-  }, 0);
+  const totalRedeemed = customers.reduce((acc, c) => acc + c.redeemCount, 0);
 
   ws1.getCell("D3").value = "Total Members (Scope)";
   ws1.getCell("D4").value = customers.length;
@@ -147,7 +145,7 @@ export const exportCustomersToExcel = async (options: ExportOptions) => {
     const row = ws1.getRow(startRow + 1 + index);
     
     const progressPct = (customer.currentStamps / settings.purchasesRequired) * 100;
-    const rewardsRedeemed = customer.recentActivity.filter(a => a.action.includes("Redeemed")).length;
+    const rewardsRedeemed = customer.redeemCount;
     const lastActivity = customer.recentActivity.length > 0 ? customer.recentActivity[0].date : "None";
     const memDate = new Date(customer.membershipDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
 
