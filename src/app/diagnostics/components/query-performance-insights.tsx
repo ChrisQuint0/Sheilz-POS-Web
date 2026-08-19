@@ -1,11 +1,14 @@
 import { DiagnosticCard } from "./ui/diagnostic-card";
-import { useDatabasePerformance } from "../hooks/use-database-performance";
-import { Activity, Gauge, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { DatabasePerformanceMetrics } from "../types";
+import { Activity, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
-export function QueryPerformanceInsights() {
-  const { data, loading } = useDatabasePerformance();
+interface QueryPerformanceInsightsProps {
+  data: DatabasePerformanceMetrics | null;
+  loading: boolean;
+}
 
+export function QueryPerformanceInsights({ data, loading }: QueryPerformanceInsightsProps) {
   if (loading || !data) {
     return (
       <DiagnosticCard
@@ -36,9 +39,14 @@ export function QueryPerformanceInsights() {
     recommendations,
   } = data;
 
-  const sparklineMin = Math.min(...tpmHistory);
-  const sparklineMax = Math.max(...tpmHistory);
+  const sparklineMin = Math.min(...(tpmHistory.length > 0 ? tpmHistory : [0]));
+  const sparklineMax = Math.max(...(tpmHistory.length > 0 ? tpmHistory : [0]));
   const sparklineRange = sparklineMax - sparklineMin || 1;
+
+  const trendMax = Math.max(
+    ...(responseTrend.length > 0 ? responseTrend.map((p) => p.ms) : [1]),
+    1
+  );
 
   return (
     <DiagnosticCard
@@ -105,15 +113,15 @@ export function QueryPerformanceInsights() {
             <span className="text-xs font-medium text-muted-foreground">
               Transactions
             </span>
-            <div className="flex flex-wrap items-end justify-between gap-2 mt-auto">
-              <span className="text-lg font-bold">{transactionsPerMinute} <span className="text-xs font-normal text-muted-foreground">TPM</span></span>
-              <div className="flex items-end h-6 gap-0.5">
+            <div className="flex items-end justify-between gap-2 mt-auto">
+              <span className="text-lg font-bold shrink-0">{transactionsPerMinute} <span className="text-xs font-normal text-muted-foreground">TPM</span></span>
+              <div className="flex flex-1 items-end justify-end h-6 gap-[1px] min-w-0">
                 {tpmHistory.map((val, i) => {
                   const heightPct = Math.max(10, ((val - sparklineMin) / sparklineRange) * 100);
                   return (
                     <div
                       key={i}
-                      className="w-1.5 bg-blue-400/80 rounded-t-sm"
+                      className="flex-1 max-w-[6px] bg-blue-400/80 rounded-t-sm"
                       style={{ height: `${heightPct}%` }}
                     />
                   );
@@ -151,18 +159,24 @@ export function QueryPerformanceInsights() {
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Response Trend (Last 30m)
           </span>
-          <div className="h-16 flex items-end gap-1 px-1">
-            {responseTrend.map((point, i) => (
-              <div key={i} className="flex-1 flex flex-col justify-end items-center group relative h-full">
-                <div
-                  className="w-full max-w-[12px] bg-[#C2456A]/40 rounded-t hover:bg-[#C2456A] transition-colors"
-                  style={{ height: `${(point.ms / 30) * 100}%`, minHeight: '4px' }}
-                />
-                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-popover text-popover-foreground text-[10px] py-0.5 px-1.5 rounded shadow whitespace-nowrap z-10 pointer-events-none transition-opacity">
-                  {point.ms}ms at {point.timestamp}
+          <div className="h-16 flex items-end gap-[1px] px-1">
+            {responseTrend.length > 0 ? (
+              responseTrend.map((point, i) => (
+                <div key={i} className="flex-1 flex flex-col justify-end items-center group relative h-full min-w-[2px]">
+                  <div
+                    className="w-full max-w-[12px] bg-[#C2456A]/40 rounded-t hover:bg-[#C2456A] transition-colors"
+                    style={{ height: `${Math.max((point.ms / trendMax) * 100, 5)}%`, minHeight: '4px' }}
+                  />
+                  <div className={`opacity-0 group-hover:opacity-100 absolute -top-8 bg-popover text-popover-foreground text-[10px] py-0.5 px-1.5 rounded shadow whitespace-nowrap z-10 pointer-events-none transition-opacity ${i > responseTrend.length - 5 ? 'right-0' : i < 5 ? 'left-0' : '-translate-x-1/2 left-1/2'}`}>
+                    {point.ms}ms at {point.timestamp}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center w-full h-full text-xs text-muted-foreground">
+                Trend data will appear after multiple refreshes
               </div>
-            ))}
+            )}
           </div>
         </div>
 

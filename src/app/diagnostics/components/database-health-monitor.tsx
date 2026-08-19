@@ -1,13 +1,16 @@
 import { DiagnosticCard } from "./ui/diagnostic-card";
-import { useDatabaseHealth } from "../hooks/use-database-health";
-import { Database, Clock, Server, Zap, HardDrive } from "lucide-react";
+import { DatabaseHealthMetrics } from "../types";
+import { Database } from "lucide-react";
 import { StatusBadge } from "./ui/status-badge";
 import { ProgressMetric, StatusMetric, TimelineItem } from "./ui/metric-items";
 import { Separator } from "@/components/ui/separator";
 
-export function DatabaseHealthMonitor() {
-  const { data, loading } = useDatabaseHealth();
+interface DatabaseHealthMonitorProps {
+  data: DatabaseHealthMetrics | null;
+  loading: boolean;
+}
 
+export function DatabaseHealthMonitor({ data, loading }: DatabaseHealthMonitorProps) {
   if (loading || !data) {
     return (
       <DiagnosticCard

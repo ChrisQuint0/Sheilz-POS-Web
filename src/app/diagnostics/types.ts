@@ -1,5 +1,29 @@
 import { DiagnosticStatus } from "./components/ui/status-badge";
 
+// ---- System Health ----
+
+export interface SystemHealthData {
+  posConnection: DiagnosticStatus;
+  database: DiagnosticStatus;
+  auth: DiagnosticStatus;
+  storage: DiagnosticStatus;
+  lastSync: string;
+  apiResponse: string;
+  serverClock: string;
+}
+
+// ---- Error Logs ----
+
+export interface ErrorLogEntry {
+  id: string;
+  timestamp: string;
+  module: string;
+  severity: string;
+  message: string;
+}
+
+// ---- Database Health ----
+
 export interface DatabaseEvent {
   id: string;
   name: string;
@@ -24,7 +48,7 @@ export interface DatabaseHealthMetrics {
   };
   sessions: SessionMetrics;
   slowQueriesCount: number;
-  cacheHitRatio: number; // percentage (0-100)
+  cacheHitRatio: number;
   storage: {
     usedGB: number;
     totalGB: number;
@@ -32,6 +56,8 @@ export interface DatabaseHealthMetrics {
   recentEvents: DatabaseEvent[];
   overallStatus: DiagnosticStatus;
 }
+
+// ---- Database Performance ----
 
 export interface PerformanceRecommendation {
   id: string;
@@ -48,9 +74,20 @@ export interface DatabasePerformanceMetrics {
   averageUpdateTimeMs: number;
   averageReadTimeMs: number;
   transactionsPerMinute: number;
-  tpmHistory: number[]; // For sparkline
-  querySuccessRate: number; // percentage
+  tpmHistory: number[];
+  querySuccessRate: number;
   failedQueriesCount: number;
-  responseTrend: { timestamp: string; ms: number }[]; // For small chart
+  responseTrend: { timestamp: string; ms: number }[];
   recommendations: PerformanceRecommendation[];
+}
+
+// ---- PDF Export ----
+
+export interface DiagnosticsPDFData {
+  systemHealth: SystemHealthData;
+  warnings: string[];
+  errorLogs: ErrorLogEntry[];
+  appDetails: Record<string, string>;
+  dbHealth: DatabaseHealthMetrics | null;
+  dbPerformance: DatabasePerformanceMetrics | null;
 }

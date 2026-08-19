@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { systemHealth } from "../mock-data";
+import { SystemHealthData } from "../types";
 import { StatusBadge, DiagnosticStatus } from "./ui/status-badge";
 import {
   Server,
@@ -53,48 +53,52 @@ function HealthCard({
   );
 }
 
-export function SystemHealthOverview() {
+interface SystemHealthOverviewProps {
+  data: SystemHealthData;
+}
+
+export function SystemHealthOverview({ data }: SystemHealthOverviewProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <HealthCard
         title="POS Connection"
-        status={systemHealth.posConnection}
+        status={data.posConnection}
         icon={<Server className="w-5 h-5" />}
         description="Terminal connectivity"
       />
       <HealthCard
         title="Database"
-        status={systemHealth.database}
+        status={data.database}
         icon={<Database className="w-5 h-5" />}
         description="Read/Write access"
       />
       <HealthCard
         title="Authentication"
-        status={systemHealth.auth}
+        status={data.auth}
         icon={<ShieldAlert className="w-5 h-5" />}
         description="User session integrity"
       />
       <HealthCard
         title="Storage"
-        status={systemHealth.storage}
+        status={data.storage}
         icon={<HardDrive className="w-5 h-5" />}
         description="Bucket availability"
       />
       <HealthCard
         title="Last Synchronization"
-        value={systemHealth.lastSync}
+        value={data.lastSync}
         icon={<RefreshCw className="w-5 h-5" />}
         description="Offline data sync"
       />
       <HealthCard
         title="API Response"
-        value={systemHealth.apiResponse}
+        value={data.apiResponse}
         icon={<Zap className="w-5 h-5" />}
         description="Average latency"
       />
       <HealthCard
         title="Server Clock"
-        value={new Date(systemHealth.serverClock).toLocaleTimeString([], {
+        value={new Date(data.serverClock).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         })}

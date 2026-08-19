@@ -1,14 +1,8 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
-import {
-  systemHealth,
-  warningCenter,
-  errorLogs,
-  applicationDiagnostics,
-  databaseHealthData,
-  databasePerformanceData,
-} from "../mock-data";
+import { DiagnosticsPDFData, DatabaseHealthMetrics, DatabasePerformanceMetrics } from "../types";
+import { DiagnosticStatus } from "../components/ui/status-badge";
 
 // Branding & Colors
 const BRAND_COLOR: [number, number, number] = [194, 69, 106]; // #C2456A
@@ -30,7 +24,38 @@ function getStatusColorArray(status: string) {
   return TEXT_MUTED;
 }
 
-export const generateDiagnosticsPDF = () => {
+export const generateDiagnosticsPDF = (data: DiagnosticsPDFData) => {
+  // Destructure with aliases matching original variable names used below
+  const { systemHealth, appDetails: applicationDiagnostics } = data;
+  const warningCenter = data.warnings;
+  const errorLogs = data.errorLogs;
+
+  const databaseHealthData: DatabaseHealthMetrics = data.dbHealth || {
+    connectionPool: { active: 0, max: 0 },
+    uptime: { days: 0, hours: 0 },
+    sessions: { active: 0, idle: 0, waiting: 0, total: 0 },
+    slowQueriesCount: 0,
+    cacheHitRatio: 0,
+    storage: { usedGB: 0, totalGB: 0 },
+    recentEvents: [],
+    overallStatus: "Healthy" as DiagnosticStatus,
+  };
+
+  const databasePerformanceData: DatabasePerformanceMetrics = data.dbPerformance || {
+    averageQueryTimeMs: 0,
+    slowestQueryMs: 0,
+    slowestQueryName: "N/A",
+    fastestQueryMs: 0,
+    averageInsertTimeMs: 0,
+    averageUpdateTimeMs: 0,
+    averageReadTimeMs: 0,
+    transactionsPerMinute: 0,
+    tpmHistory: [],
+    querySuccessRate: 0,
+    failedQueriesCount: 0,
+    responseTrend: [],
+    recommendations: [],
+  };
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -68,12 +93,17 @@ export const generateDiagnosticsPDF = () => {
   
   // Overall Status badge top right
   const statusX = pageWidth - margin - 25;
-  doc.setFillColor(SUCCESS_COLOR[0], SUCCESS_COLOR[1], SUCCESS_COLOR[2]);
+  const overallLabel = [systemHealth.posConnection, systemHealth.database, systemHealth.auth, systemHealth.storage]
+    .some(s => s === "Critical") ? "CRITICAL"
+    : [systemHealth.posConnection, systemHealth.database, systemHealth.auth, systemHealth.storage]
+    .some(s => s === "Warning") ? "WARNING" : "HEALTHY";
+  const badgeColor = overallLabel === "CRITICAL" ? ERROR_COLOR : overallLabel === "WARNING" ? WARNING_COLOR : SUCCESS_COLOR;
+  doc.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
   doc.roundedRect(statusX, currentY - 14, 25, 6, 1, 1, "F");
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(255, 255, 255);
-  doc.text("HEALTHY", statusX + 12.5, currentY - 10, { align: "center" });
+  doc.text(overallLabel, statusX + 12.5, currentY - 10, { align: "center" });
 
   currentY += 5;
   doc.setDrawColor(BORDER_COLOR[0], BORDER_COLOR[1], BORDER_COLOR[2]);

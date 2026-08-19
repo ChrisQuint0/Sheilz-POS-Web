@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { DiagnosticCard } from "./ui/diagnostic-card";
-import { errorLogs } from "../mock-data";
+import { ErrorLogEntry } from "../types";
 import { FileWarning } from "lucide-react";
 import { StatusBadge } from "./ui/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,11 @@ import "ag-grid-community/styles/ag-theme-quartz.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-export function ErrorLogPreview() {
+interface ErrorLogPreviewProps {
+  logs: ErrorLogEntry[];
+}
+
+export function ErrorLogPreview({ logs }: ErrorLogPreviewProps) {
   const colDefs = useMemo<ColDef[]>(
     () => [
       {
@@ -50,25 +54,6 @@ export function ErrorLogPreview() {
         minWidth: 250,
         tooltipValueGetter: (params) => params.value,
       },
-      {
-        field: "status",
-        headerName: "Status",
-        cellRenderer: (params: any) => {
-          const status = params.value;
-          const isResolved = status === "Resolved";
-          return (
-            <div style={{ display: "flex", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
-              <Badge
-                variant="secondary"
-                className={`text-[10px] font-normal ${isResolved ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-red-50 text-red-700 hover:bg-red-100"}`}
-              >
-                {status}
-              </Badge>
-            </div>
-          );
-        },
-        minWidth: 100,
-      },
     ],
     []
   );
@@ -91,7 +76,7 @@ export function ErrorLogPreview() {
       <div className="ag-theme-quartz w-full" style={{ height: "400px" }}>
         <AgGridReact
           theme="legacy"
-          rowData={errorLogs}
+          rowData={logs}
           columnDefs={colDefs}
           defaultColDef={defaultColDef}
           rowSelection="single"

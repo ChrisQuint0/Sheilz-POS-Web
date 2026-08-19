@@ -77,9 +77,9 @@ export function StatusMetric({
   }
 
   return (
-    <div className="flex flex-col gap-1 p-3 rounded-lg border bg-card shadow-sm">
-      <div className="flex flex-wrap justify-between items-start gap-1">
-        <span className="text-xs font-medium text-muted-foreground">
+    <div className="flex flex-col gap-1 p-3 rounded-lg border bg-card shadow-sm min-w-0">
+      <div className="flex justify-between items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground truncate">
           {label}
         </span>
         <div

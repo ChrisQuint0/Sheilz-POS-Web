@@ -1,18 +1,22 @@
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Activity, Loader2 } from "lucide-react";
-import { StatusBadge } from "./ui/status-badge";
-import { systemHealth } from "../mock-data";
+import { StatusBadge, DiagnosticStatus } from "./ui/status-badge";
 import { useState } from "react";
-import { generateDiagnosticsPDF } from "../utils/generate-pdf";
 
 interface DiagnosticsHeaderProps {
   onRefresh: () => void;
   loading?: boolean;
+  overallStatus: DiagnosticStatus;
+  lastChecked: Date | null;
+  onExport: () => void;
 }
 
 export function DiagnosticsHeader({
   onRefresh,
   loading = false,
+  overallStatus,
+  lastChecked,
+  onExport,
 }: DiagnosticsHeaderProps) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -20,13 +24,21 @@ export function DiagnosticsHeader({
     setIsExporting(true);
     try {
       // Small delay to allow UI to update to loading state
-      await new Promise(resolve => setTimeout(resolve, 100));
-      generateDiagnosticsPDF();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      onExport();
     } catch (error) {
       console.error("Failed to generate PDF:", error);
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const getLastCheckedText = () => {
+    if (!lastChecked) return "Never";
+    const diffMs = Date.now() - lastChecked.getTime();
+    if (diffMs < 5000) return "Just now";
+    if (diffMs < 60000) return `${Math.floor(diffMs / 1000)}s ago`;
+    return `${Math.floor(diffMs / 60000)}m ago`;
   };
 
   return (
@@ -77,9 +89,9 @@ export function DiagnosticsHeader({
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>System Status:</span>
-          <StatusBadge status="Healthy" showIcon={false} />
+          <StatusBadge status={overallStatus} showIcon={false} />
           <span className="mx-1">•</span>
-          <span>Last checked: Just now</span>
+          <span>Last checked: {getLastCheckedText()}</span>
         </div>
       </div>
     </div>
