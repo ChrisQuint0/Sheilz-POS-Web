@@ -23,9 +23,15 @@ import {
   Check,
   X,
   ImagePlus,
+  ImageOff,
 } from "lucide-react";
 import { createClient } from "@/app/lib/supabase/client";
-import { uploadImage, replaceImage } from "@/app/lib/supabase/storage";
+import {
+  uploadImage,
+  replaceImage,
+  deleteImage,
+} from "@/app/lib/supabase/storage";
+import { toast } from "sonner";
 
 interface MoreSettingsModalProps {
   open: boolean;
@@ -65,7 +71,9 @@ export function MoreSettingsModal({
 
   // --- Payment Image Upload state ---
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingPaymentId, setUploadingPaymentId] = useState<string | null>(null);
+  const [uploadingPaymentId, setUploadingPaymentId] = useState<string | null>(
+    null,
+  );
 
   const supabase = createClient();
 
@@ -175,16 +183,31 @@ export function MoreSettingsModal({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Always reset the input so picking the same file twice still fires onChange
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file || !uploadingPaymentId) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image too large", {
+        description: "Please choose an image under 5MB.",
+      });
+      setUploadingPaymentId(null);
+      return;
+    }
 
     setIsLoading(true);
     try {
       const payment = paymentMethods.find((p) => p.id === uploadingPaymentId);
       if (!payment) return;
 
-      let publicUrl;
+      let publicUrl: string;
       if (payment.image) {
-        publicUrl = await replaceImage(payment.image, file, "payments", payment.id);
+        publicUrl = await replaceImage(
+          payment.image,
+          file,
+          "payments",
+          payment.id,
+        );
       } else {
         publicUrl = await uploadImage(file, "payments", payment.id);
       }
@@ -197,15 +220,48 @@ export function MoreSettingsModal({
       if (error) throw error;
 
       setPaymentMethods((prev) =>
-        prev.map((p) => (p.id === payment.id ? { ...p, image: publicUrl } : p))
+        prev.map((p) => (p.id === payment.id ? { ...p, image: publicUrl } : p)),
       );
+      toast.success("Logo uploaded", { description: payment.name });
     } catch (err) {
       console.error("Error uploading image:", err);
-      alert("Failed to upload image");
+      toast.error("Failed to upload image", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setIsLoading(false);
       setUploadingPaymentId(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = async (paymentId: string, imageUrl: string) => {
+    setIsLoading(true);
+    try {
+      // Best-effort storage cleanup; ignore failures so the UI can still update
+      try {
+        await deleteImage(imageUrl);
+      } catch (cleanupErr) {
+        console.error("Failed to delete image from storage:", cleanupErr);
+      }
+
+      const { error } = await supabase
+        .from("payment_methods")
+        .update({ image_url: null })
+        .eq("id", paymentId);
+
+      if (error) throw error;
+
+      setPaymentMethods((prev) =>
+        prev.map((p) => (p.id === paymentId ? { ...p, image: undefined } : p)),
+      );
+      toast.success("Logo removed");
+    } catch (err) {
+      console.error("Error removing image:", err);
+      toast.error("Failed to remove logo", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -245,6 +301,17 @@ export function MoreSettingsModal({
   const handleDeletePayment = async (id: string) => {
     setIsLoading(true);
     try {
+      // Clean up the image in storage before deleting the DB row
+      const payment = paymentMethods.find((p) => p.id === id);
+      if (payment?.image) {
+        try {
+          await deleteImage(payment.image);
+        } catch (cleanupErr) {
+          console.error("Failed to delete image from storage:", cleanupErr);
+          // Continue with DB delete even if storage cleanup fails
+        }
+      }
+
       const { error } = await supabase
         .from("payment_methods")
         .delete()
@@ -733,7 +800,11 @@ export function MoreSettingsModal({
                         <div className="flex items-center gap-3">
                           <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" />
                           {pm.image && (
-                            <img src={pm.image} alt={pm.name} className="w-8 h-8 object-contain rounded border bg-white" />
+                            <img
+                              src={pm.image}
+                              alt={pm.name}
+                              className="w-8 h-8 object-contain rounded border bg-white"
+                            />
                           )}
                           <span className="font-medium text-sm text-[#3a2b27]">
                             {pm.name}
@@ -757,10 +828,22 @@ export function MoreSettingsModal({
                               onClick={() => handleUploadClick(pm.id)}
                               className="text-gray-300 hover:text-indigo-500 p-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
                               disabled={isLoading}
-                              title="Upload Logo"
+                              title={pm.image ? "Replace Logo" : "Upload Logo"}
                             >
                               <ImagePlus className="w-4 h-4" />
                             </button>
+                            {pm.image && (
+                              <button
+                                onClick={() =>
+                                  handleRemoveImage(pm.id, pm.image!)
+                                }
+                                className="text-gray-300 hover:text-orange-500 p-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-50"
+                                disabled={isLoading}
+                                title="Remove Logo"
+                              >
+                                <ImageOff className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => startEdit(pm.id, pm.name)}
                               className="text-gray-300 hover:text-blue-500 p-1.5 rounded-lg hover:bg-blue-50 disabled:opacity-50"
