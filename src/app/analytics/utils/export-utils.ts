@@ -334,16 +334,19 @@ export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilte
 
     // 9. Void Analysis
     if (data.voidAnalysis) {
+      const rawVoid = data.voidAnalysis;
+      const voidStats = ('all' in rawVoid && rawVoid.all) ? rawVoid.all : rawVoid;
+
       const s = wb.addWorksheet("Void Analysis");
       s.columns = [
         { header: "Metric", key: "met", width: 30 },
         { header: "Value", key: "val", width: 20 },
       ];
       
-      s.addRow({ met: "Total Voids", val: data.voidAnalysis.total_voids });
-      s.addRow({ met: "Void Rate", val: data.voidAnalysis.void_rate / 100 });
-      s.addRow({ met: "Revenue Lost", val: data.voidAnalysis.revenue_lost });
-      s.addRow({ met: "Total Orders", val: data.voidAnalysis.total_orders });
+      s.addRow({ met: "Total Voids", val: voidStats.total_voids || 0 });
+      s.addRow({ met: "Void Rate", val: (voidStats.void_rate || 0) / 100 });
+      s.addRow({ met: "Revenue Lost", val: voidStats.revenue_lost || 0 });
+      s.addRow({ met: "Total Orders", val: rawVoid.total_orders || 0 });
       
       s.getRow(1).font = headerStyle.font;
       s.getRow(1).fill = headerStyle.fill;
@@ -657,16 +660,19 @@ export const exportChartsToPDF = async (data: AnalyticsData, filters: AnalyticsF
   }
 
   if (data.voidAnalysis) {
+    const rawVoid = data.voidAnalysis;
+    const voidStats = ('all' in rawVoid && rawVoid.all) ? rawVoid.all : rawVoid;
+
     items.push({
       title: "Void Analysis",
       subtitle: "Waste and loss tracking",
       canvasTitle: null,
       tableHead: ["Metric", "Value"],
       tableBody: [
-        ["Total Voids", data.voidAnalysis.total_voids.toString()],
-        ["Void Rate", `${data.voidAnalysis.void_rate}%`],
-        ["Revenue Lost", formatCurrency(data.voidAnalysis.revenue_lost)],
-        ["Total Orders", data.voidAnalysis.total_orders.toString()],
+        ["Total Voids", (voidStats.total_voids || 0).toString()],
+        ["Void Rate", `${voidStats.void_rate || 0}%`],
+        ["Revenue Lost", formatCurrency(voidStats.revenue_lost || 0)],
+        ["Total Orders", (rawVoid.total_orders || 0).toString()],
       ],
       maxChartHeight: 0
     });

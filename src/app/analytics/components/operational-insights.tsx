@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { Doughnut } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultChartOptions, chartColors } from "./chart-setup";
@@ -8,6 +10,7 @@ import { useAnalytics } from "../analytics-context";
 
 export function OperationalInsights() {
   const { data, loading } = useAnalytics();
+  const [voidType, setVoidType] = useState<"consumed" | "not_made" | "all">("consumed");
 
   if (loading) {
     return (
@@ -23,7 +26,11 @@ export function OperationalInsights() {
   }
 
   const transactionStatus = data.transactionStatus;
-  const voidAnalysis = data.voidAnalysis;
+  const rawVoidAnalysis = data.voidAnalysis;
+  const isNewFormat = rawVoidAnalysis && 'consumed' in rawVoidAnalysis;
+  const voidAnalysis = rawVoidAnalysis 
+    ? (isNewFormat ? (rawVoidAnalysis as any)[voidType] : rawVoidAnalysis) 
+    : null;
 
   const statusLabels = transactionStatus.map(s => s.status);
   const statusValues = transactionStatus.map(s => Number(s.percentage));
@@ -95,13 +102,28 @@ export function OperationalInsights() {
       
       <Card className="shadow-sm col-span-full md:col-span-1 lg:col-span-1">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            Void Analysis
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Waste and loss tracking
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Void Analysis
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Waste and loss tracking
+              </p>
+            </div>
+            {isNewFormat && (
+              <select
+                value={voidType}
+                onChange={(e) => setVoidType(e.target.value as any)}
+                className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="consumed">Consumed</option>
+                <option value="not_made">Not Made</option>
+                <option value="all">All</option>
+              </select>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-2">
           {voidAnalysis ? (

@@ -64,10 +64,23 @@ export interface TransactionStatus {
   percentage: number;
 }
 
-export interface VoidAnalysis {
+export interface VoidAnalysisDetails {
   total_voids: number;
   revenue_lost: number;
   void_rate: number;
+}
+
+export interface VoidAnalysis {
+  // Old format
+  total_voids?: number;
+  revenue_lost?: number;
+  void_rate?: number;
+  
+  // New format
+  consumed?: VoidAnalysisDetails;
+  not_made?: VoidAnalysisDetails;
+  all?: VoidAnalysisDetails;
+  
   total_orders: number;
 }
 

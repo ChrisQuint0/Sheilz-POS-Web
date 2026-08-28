@@ -47,6 +47,21 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
     }));
   };
 
+  const checkPreset = (days: number) => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - days);
+
+    const formatDate = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    return filters.dateFrom === formatDate(start) && filters.dateTo === formatDate(today);
+  };
+
   return (
     <div className="flex flex-col gap-5 mb-8">
       {/* Header — matches dashboard style */}
@@ -112,9 +127,33 @@ export function AnalyticsFilters({ onExportExcel, onExportCharts, onRefresh }: A
               </div>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <Button type="button" variant="secondary" size="sm" className="h-6 px-2.5 text-[11px] rounded bg-muted/60 hover:bg-muted font-medium text-muted-foreground transition-colors" onClick={() => setDatePreset(7)}>Last 7 Days</Button>
-              <Button type="button" variant="secondary" size="sm" className="h-6 px-2.5 text-[11px] rounded bg-muted/60 hover:bg-muted font-medium text-muted-foreground transition-colors" onClick={() => setDatePreset(30)}>Last 30 Days</Button>
-              <Button type="button" variant="secondary" size="sm" className="h-6 px-2.5 text-[11px] rounded bg-muted/60 hover:bg-muted font-medium text-muted-foreground transition-colors" onClick={() => setDatePreset(90)}>Last 90 Days</Button>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                size="sm" 
+                className={`h-6 px-2.5 text-[11px] rounded transition-colors font-medium ${checkPreset(7) ? 'bg-[#C2456A] text-white hover:bg-[#C2456A]/90' : 'bg-muted/60 hover:bg-muted text-muted-foreground'}`} 
+                onClick={() => setDatePreset(7)}
+              >
+                Last 7 Days
+              </Button>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                size="sm" 
+                className={`h-6 px-2.5 text-[11px] rounded transition-colors font-medium ${checkPreset(30) ? 'bg-[#C2456A] text-white hover:bg-[#C2456A]/90' : 'bg-muted/60 hover:bg-muted text-muted-foreground'}`} 
+                onClick={() => setDatePreset(30)}
+              >
+                Last 30 Days
+              </Button>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                size="sm" 
+                className={`h-6 px-2.5 text-[11px] rounded transition-colors font-medium ${checkPreset(90) ? 'bg-[#C2456A] text-white hover:bg-[#C2456A]/90' : 'bg-muted/60 hover:bg-muted text-muted-foreground'}`} 
+                onClick={() => setDatePreset(90)}
+              >
+                Last 90 Days
+              </Button>
             </div>
           </div>
         </div>
