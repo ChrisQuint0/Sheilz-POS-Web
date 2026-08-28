@@ -36,15 +36,13 @@ interface IngredientOption {
 }
 
 export function InventoryTurnover() {
-  const { data: analyticsData, loading, filters } = useAnalytics();
+  const { data: analyticsData, loading, filters, selectedIngredient, setSelectedIngredient, ingredientTurnoverData: filteredData, setIngredientTurnoverData: setFilteredData } = useAnalytics();
   const contextData = analyticsData.inventoryTurnover;
 
   // ─────────────────────────────────────────────
-  // Ingredient filter state (local to this widget)
+  // Ingredient filter state (shared via context)
   // ─────────────────────────────────────────────
   const [ingredients, setIngredients] = useState<IngredientOption[]>([]);
-  const [selectedIngredient, setSelectedIngredient] = useState<string>("all");
-  const [filteredData, setFilteredData] = useState<InventoryTurnoverData | null>(null);
   const [ingredientLoading, setIngredientLoading] = useState(false);
 
   // Load ingredient list once
@@ -86,7 +84,7 @@ export function InventoryTurnover() {
     });
     setFilteredData(data ?? null);
     setIngredientLoading(false);
-  }, [filters.dateFrom, filters.dateTo]);
+  }, [filters.dateFrom, filters.dateTo, setFilteredData]);
 
   // Re-fetch when ingredient selection or date range changes
   useEffect(() => {
@@ -231,7 +229,7 @@ export function InventoryTurnover() {
             <Filter className="h-3.5 w-3.5" />
             <Select
               value={selectedIngredient}
-              onValueChange={(val) => setSelectedIngredient(val)}
+              onValueChange={(val) => setSelectedIngredient(val ?? "all")}
             >
               <SelectTrigger size="sm" className="h-7 min-w-[150px] max-w-[200px] text-xs">
                 <span className="truncate">

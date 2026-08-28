@@ -121,6 +121,8 @@ export interface AnalyticsData {
   inventoryTurnover: InventoryTurnoverData | null;
 }
 
+export type VoidTypeFilter = "consumed" | "not_made" | "all";
+
 export interface AnalyticsContextType {
   filters: AnalyticsFilters;
   setFilters: React.Dispatch<React.SetStateAction<AnalyticsFilters>>;
@@ -132,6 +134,14 @@ export interface AnalyticsContextType {
   categories: string[];
   paymentMethods: string[];
   cashiers: string[];
+  // Widget-level filters (shared so exports can access them)
+  voidType: VoidTypeFilter;
+  setVoidType: React.Dispatch<React.SetStateAction<VoidTypeFilter>>;
+  selectedIngredient: string;
+  setSelectedIngredient: React.Dispatch<React.SetStateAction<string>>;
+  selectedIngredientName: string;
+  ingredientTurnoverData: InventoryTurnoverData | null;
+  setIngredientTurnoverData: React.Dispatch<React.SetStateAction<InventoryTurnoverData | null>>;
 }
 
 // ────────────────────────────────────────────────
@@ -191,22 +201,34 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [cashiers, setCashiers] = useState<string[]>([]);
 
+  // Widget-level filters (lifted from components for export access)
+  const [voidType, setVoidType] = useState<VoidTypeFilter>("consumed");
+  const [selectedIngredient, setSelectedIngredient] = useState<string>("all");
+  const [ingredientTurnoverData, setIngredientTurnoverData] = useState<InventoryTurnoverData | null>(null);
+  const [ingredientsList, setIngredientsList] = useState<{id: string; name: string}[]>([]);
+
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load dropdown options once
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const [catRes, pmRes, cashierRes] = await Promise.all([
+      const [catRes, pmRes, cashierRes, ingRes] = await Promise.all([
         supabase.from("product_categories").select("name").order("name"),
         supabase.rpc("get_analytics_payment_methods"),
         supabase.rpc("get_cashier_list"),
+        supabase.from("inventory_items").select("id, name").order("name"),
       ]);
       if (catRes.data) setCategories(catRes.data.map((r: { name: string }) => r.name));
       if (pmRes.data) setPaymentMethods(pmRes.data.map((r: { method_name: string }) => r.method_name));
       if (cashierRes.data) setCashiers(cashierRes.data.map((r: { cashier_name: string }) => r.cashier_name));
+      if (ingRes.data) setIngredientsList(ingRes.data as {id: string; name: string}[]);
     })();
   }, []);
+
+  const selectedIngredientName = selectedIngredient === "all"
+    ? "All Ingredients"
+    : ingredientsList.find(i => i.id === selectedIngredient)?.name ?? "All Ingredients";
 
   // Fetch analytics data
   const fetchData = useCallback(async () => {
@@ -312,6 +334,13 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         categories,
         paymentMethods,
         cashiers,
+        voidType,
+        setVoidType,
+        selectedIngredient,
+        setSelectedIngredient,
+        selectedIngredientName,
+        ingredientTurnoverData,
+        setIngredientTurnoverData,
       }}
     >
       {children}

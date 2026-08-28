@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { Doughnut } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultChartOptions, chartColors } from "./chart-setup";
@@ -9,8 +7,7 @@ import { AlertTriangle, Receipt, ShieldAlert, Loader2 } from "lucide-react";
 import { useAnalytics } from "../analytics-context";
 
 export function OperationalInsights() {
-  const { data, loading } = useAnalytics();
-  const [voidType, setVoidType] = useState<"consumed" | "not_made" | "all">("consumed");
+  const { data, loading, voidType, setVoidType } = useAnalytics();
 
   if (loading) {
     return (

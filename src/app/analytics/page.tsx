@@ -14,16 +14,21 @@ import { OperationalInsights } from "./components/operational-insights";
 import { exportToExcel, exportChartsToPDF } from "./utils/export-utils";
 
 function AnalyticsDashboard() {
-  const { data, filters, refresh } = useAnalytics();
+  const { data, filters, refresh, voidType, selectedIngredient, selectedIngredientName, ingredientTurnoverData } = useAnalytics();
+
+  // Resolve the active inventory turnover data based on the widget's ingredient filter
+  const activeInventoryTurnover = selectedIngredient === "all"
+    ? data.inventoryTurnover
+    : ingredientTurnoverData;
 
   const handleExportExcel = async () => {
-    exportToExcel(data, filters);
+    exportToExcel(data, filters, { voidType, inventoryTurnover: activeInventoryTurnover, selectedIngredientName });
     const { logAppEvent } = await import('@/app/audit/actions');
     logAppEvent("Report Exported", "Low", "Report", "Analytics_Report.xlsx", null).catch(console.error);
   };
 
   const handleExportCharts = async () => {
-    await exportChartsToPDF(data, filters);
+    await exportChartsToPDF(data, filters, { voidType, inventoryTurnover: activeInventoryTurnover, selectedIngredientName });
     const { logAppEvent } = await import('@/app/audit/actions');
     logAppEvent("Report Exported", "Low", "Report", "Sheilz_Analytics_Charts.pdf", null).catch(console.error);
   };

@@ -2,7 +2,13 @@ import * as ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { AnalyticsData, AnalyticsFilters } from "../analytics-context";
+import { AnalyticsData, AnalyticsFilters, InventoryTurnoverData, VoidTypeFilter } from "../analytics-context";
+
+export interface WidgetExportOptions {
+  voidType: VoidTypeFilter;
+  inventoryTurnover: InventoryTurnoverData | null;
+  selectedIngredientName: string;
+}
 
 // Helper for dynamic file name
 const generateFileName = (filters: AnalyticsFilters) => {
@@ -20,7 +26,7 @@ const generateFileName = (filters: AnalyticsFilters) => {
   return `Analytics_Report_${datePart}.xlsx`;
 };
 
-export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilters) => {
+export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilters, widgetOptions?: WidgetExportOptions) => {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Sheilz Coffee";
   wb.lastModifiedBy = "Sheilz POS System";
@@ -335,14 +341,19 @@ export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilte
     // 9. Void Analysis
     if (data.voidAnalysis) {
       const rawVoid = data.voidAnalysis;
-      const voidStats = ('all' in rawVoid && rawVoid.all) ? rawVoid.all : rawVoid;
+      const activeVoidType = widgetOptions?.voidType ?? "all";
+      const isNewFormat = 'consumed' in rawVoid;
+      const voidStats = isNewFormat ? (rawVoid as any)[activeVoidType] ?? rawVoid : rawVoid;
+
+      const voidTypeLabel = activeVoidType === "consumed" ? "Consumed" : activeVoidType === "not_made" ? "Not Made" : "All";
 
       const s = wb.addWorksheet("Void Analysis");
       s.columns = [
         { header: "Metric", key: "met", width: 30 },
         { header: "Value", key: "val", width: 20 },
       ];
-      
+
+      s.addRow({ met: "Void Filter", val: voidTypeLabel });
       s.addRow({ met: "Total Voids", val: voidStats.total_voids || 0 });
       s.addRow({ met: "Void Rate", val: (voidStats.void_rate || 0) / 100 });
       s.addRow({ met: "Revenue Lost", val: voidStats.revenue_lost || 0 });
@@ -352,18 +363,19 @@ export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilte
       s.getRow(1).fill = headerStyle.fill;
       s.getRow(1).border = headerStyle.border;
       
-      s.getCell("B2").numFmt = numberFormat;
-      s.getCell("B3").numFmt = percentFormat;
-      s.getCell("B4").numFmt = currencyFormat;
-      s.getCell("B5").numFmt = numberFormat;
+      s.getCell("B2").font = { bold: true, color: { argb: primaryColor } };
+      s.getCell("B3").numFmt = numberFormat;
+      s.getCell("B4").numFmt = percentFormat;
+      s.getCell("B5").numFmt = currencyFormat;
+      s.getCell("B6").numFmt = numberFormat;
 
       s.addConditionalFormatting({
-        ref: 'B3:B3',
+        ref: 'B4:B4',
         rules: [{
           priority: 2,
           type: 'colorScale',
           cfvo: [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }],
-          color: [{ argb: 'FF63BE7B' }, { argb: 'FFFFEB84' }, { argb: 'FFF8696B' }] // Low -> Green, High -> Red
+          color: [{ argb: 'FF63BE7B' }, { argb: 'FFFFEB84' }, { argb: 'FFF8696B' }]
         }]
       });
       s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
@@ -428,6 +440,72 @@ export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilte
         }]
       });
     }
+
+    // 12. Inventory Turnover
+    const turnoverData = widgetOptions?.inventoryTurnover ?? data.inventoryTurnover;
+    if (turnoverData) {
+      const s = wb.addWorksheet("Inventory Turnover");
+      s.columns = [
+        { header: "Metric", key: "met", width: 35 },
+        { header: "Value", key: "val", width: 25 },
+      ];
+
+      const ingredientLabel = widgetOptions?.selectedIngredientName ?? "All Ingredients";
+      s.addRow({ met: "Ingredient Filter", val: ingredientLabel });
+      s.addRow({ met: "Turnover Rate", val: turnoverData.turnoverRate !== null ? `${turnoverData.turnoverRate.toFixed(2)}×` : "N/A" });
+      s.addRow({ met: "Days in Inventory", val: turnoverData.daysInInventory !== null ? `${turnoverData.daysInInventory.toFixed(1)} days` : "N/A" });
+      s.addRow({ met: "Estimated COGS", val: turnoverData.estimatedCogs });
+      s.addRow({ met: "Average Inventory Value", val: turnoverData.averageInventory });
+      s.addRow({ met: "Beginning Inventory Value", val: turnoverData.beginningInventory });
+      s.addRow({ met: "Ending Inventory Value", val: turnoverData.endingInventory });
+      if (turnoverData.previousPeriodTurnover !== null) {
+        s.addRow({ met: "Previous Period Turnover", val: `${turnoverData.previousPeriodTurnover.toFixed(2)}×` });
+      }
+      if (turnoverData.changePercent !== null) {
+        s.addRow({ met: "Change vs. Previous Period", val: turnoverData.changePercent / 100 });
+      }
+      if (turnoverData.missingCostCount > 0) {
+        s.addRow({ met: "Missing Cost Warning", val: `${turnoverData.missingCostCount} ingredient(s) missing unit cost` });
+      }
+
+      s.getRow(1).font = headerStyle.font;
+      s.getRow(1).fill = headerStyle.fill;
+      s.getRow(1).border = headerStyle.border;
+
+      s.getCell("B2").font = { bold: true, color: { argb: primaryColor } };
+      s.getCell("B5").numFmt = currencyFormat;
+      s.getCell("B6").numFmt = currencyFormat;
+      s.getCell("B7").numFmt = currencyFormat;
+      s.getCell("B8").numFmt = currencyFormat;
+
+      // Find change percent row and format it
+      s.eachRow((row) => {
+        const metricCell = row.getCell(1);
+        if (metricCell.value === "Change vs. Previous Period") {
+          row.getCell(2).numFmt = percentFormat;
+        }
+      });
+
+      // Trend data sub-table
+      if (turnoverData.trend && turnoverData.trend.length > 0) {
+        const emptyRow = s.rowCount + 2;
+        s.getCell(`A${emptyRow}`).value = "Turnover Trend";
+        s.getCell(`A${emptyRow}`).font = { size: 12, bold: true, color: { argb: primaryColor } };
+
+        const trendHeaderRow = emptyRow + 1;
+        s.getCell(`A${trendHeaderRow}`).value = "Period";
+        s.getCell(`B${trendHeaderRow}`).value = "Turnover Rate";
+        s.getRow(trendHeaderRow).font = headerStyle.font;
+        s.getRow(trendHeaderRow).fill = headerStyle.fill;
+        s.getRow(trendHeaderRow).border = headerStyle.border;
+
+        turnoverData.trend.forEach(t => {
+          s.addRow({ met: t.label, val: t.value });
+        });
+      }
+
+      s.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+    }
   }
 
   // Generate File Name
@@ -439,7 +517,7 @@ export const exportToExcel = async (data: AnalyticsData, filters: AnalyticsFilte
   saveAs(blob, fileName);
 };
 
-export const exportChartsToPDF = async (data: AnalyticsData, filters: AnalyticsFilters) => {
+export const exportChartsToPDF = async (data: AnalyticsData, filters: AnalyticsFilters, widgetOptions?: WidgetExportOptions) => {
   const pdf = new jsPDF("p", "mm", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -661,14 +739,18 @@ export const exportChartsToPDF = async (data: AnalyticsData, filters: AnalyticsF
 
   if (data.voidAnalysis) {
     const rawVoid = data.voidAnalysis;
-    const voidStats = ('all' in rawVoid && rawVoid.all) ? rawVoid.all : rawVoid;
+    const activeVoidType = widgetOptions?.voidType ?? "all";
+    const isNewFormat = 'consumed' in rawVoid;
+    const voidStats = isNewFormat ? (rawVoid as any)[activeVoidType] ?? rawVoid : rawVoid;
+    const voidTypeLabel = activeVoidType === "consumed" ? "Consumed" : activeVoidType === "not_made" ? "Not Made" : "All";
 
     items.push({
       title: "Void Analysis",
-      subtitle: "Waste and loss tracking",
+      subtitle: `Waste and loss tracking (Filter: ${voidTypeLabel})`,
       canvasTitle: null,
       tableHead: ["Metric", "Value"],
       tableBody: [
+        ["Void Filter", voidTypeLabel],
         ["Total Voids", (voidStats.total_voids || 0).toString()],
         ["Void Rate", `${voidStats.void_rate || 0}%`],
         ["Revenue Lost", formatCurrency(voidStats.revenue_lost || 0)],
@@ -697,6 +779,40 @@ export const exportChartsToPDF = async (data: AnalyticsData, filters: AnalyticsF
       tableHead: ["Item", "Quantity"],
       tableBody: [...data.leastConsumed].sort((a,b)=>a.total_consumed-b.total_consumed).map(i => [`${i.item_name} (${i.unit})`, i.total_consumed.toString()]),
       maxChartHeight: 50
+    });
+  }
+
+  // Inventory Turnover
+  const turnoverData = widgetOptions?.inventoryTurnover ?? data.inventoryTurnover;
+  if (turnoverData) {
+    const ingredientLabel = widgetOptions?.selectedIngredientName ?? "All Ingredients";
+    const turnoverTableBody: any[][] = [
+      ["Ingredient Filter", ingredientLabel],
+      ["Turnover Rate", turnoverData.turnoverRate !== null ? `${turnoverData.turnoverRate.toFixed(2)}×` : "N/A"],
+      ["Days in Inventory", turnoverData.daysInInventory !== null ? `${turnoverData.daysInInventory.toFixed(1)} days` : "N/A"],
+      ["Estimated COGS", formatCurrency(turnoverData.estimatedCogs)],
+      ["Average Inventory Value", formatCurrency(turnoverData.averageInventory)],
+      ["Beginning Inventory", formatCurrency(turnoverData.beginningInventory)],
+      ["Ending Inventory", formatCurrency(turnoverData.endingInventory)],
+    ];
+    if (turnoverData.previousPeriodTurnover !== null) {
+      turnoverTableBody.push(["Previous Period Turnover", `${turnoverData.previousPeriodTurnover.toFixed(2)}×`]);
+    }
+    if (turnoverData.changePercent !== null) {
+      const sign = turnoverData.changePercent >= 0 ? "+" : "";
+      turnoverTableBody.push(["Change vs. Previous", `${sign}${(turnoverData.changePercent).toFixed(1)}%`]);
+    }
+    if (turnoverData.missingCostCount > 0) {
+      turnoverTableBody.push(["⚠ Missing Costs", `${turnoverData.missingCostCount} ingredient(s)`]);
+    }
+
+    items.push({
+      title: "Inventory Turnover",
+      subtitle: ingredientLabel === "All Ingredients" ? "Overall inventory efficiency" : `Turnover for ${ingredientLabel}`,
+      canvasTitle: "Inventory Turnover",
+      tableHead: ["Metric", "Value"],
+      tableBody: turnoverTableBody,
+      maxChartHeight: 60
     });
   }
 
