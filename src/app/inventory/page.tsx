@@ -20,6 +20,7 @@ import {
   InventoryTransaction,
   getInventoryStatus,
 } from "./data";
+import { logAppEvent } from "@/app/audit/actions";
 import { createClient } from "@/app/lib/supabase/client";
 import { deleteImage } from "@/app/lib/supabase/storage";
 import { InventoryCard } from "./components/inventory-card";
@@ -94,7 +95,8 @@ export default function InventoryPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [transactionDateFilter, setTransactionDateFilter] = useState("All Time");
+  const [transactionDateFilter, setTransactionDateFilter] =
+    useState("All Time");
 
   // Modals state
   const [modalOpen, setModalOpen] = useState(false);
@@ -228,13 +230,14 @@ export default function InventoryPage() {
         item.unit.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory =
         categoryFilter === "all" || item.categoryId === categoryFilter;
-        
+
       let matchesLowStock = true;
       if (showLowStockOnly) {
         const s = getInventoryStatus(item);
-        matchesLowStock = s === "Low Stock" || s === "Critical Stock" || s === "Out of Stock";
+        matchesLowStock =
+          s === "Low Stock" || s === "Critical Stock" || s === "Out of Stock";
       }
-      
+
       return matchesSearch && matchesCategory && matchesLowStock;
     });
   }, [items, searchQuery, categoryFilter, showLowStockOnly]);
@@ -716,18 +719,41 @@ export default function InventoryPage() {
 
   // Export Data
   const handleExportData = async () => {
-    await exportInventoryToExcel(
-      filteredItems,
-      categories,
+    await logAppEvent(
+      "Report Exported",
+      "Low",
+      "Inventory",
+      "Inventory Stock Report",
       {
         search: searchQuery,
         category: categoryFilter,
         showLowStockOnly: showLowStockOnly,
-      }
+      },
     );
+    await exportInventoryToExcel(filteredItems, categories, {
+      search: searchQuery,
+      category: categoryFilter,
+      showLowStockOnly: showLowStockOnly,
+    });
   };
 
-  const handleExportTransactions = async (startDate: string, endDate: string, preset: string) => {
+  const handleExportTransactions = async (
+    startDate: string,
+    endDate: string,
+    preset: string,
+  ) => {
+    await logAppEvent(
+      "Report Exported",
+      "Low",
+      "Inventory",
+      "Inventory Ledger Report",
+      {
+        startDate,
+        endDate,
+        preset,
+      },
+    );
+
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
@@ -869,7 +895,7 @@ export default function InventoryPage() {
                 </div>
               </div>
               <div className="h-8 w-px bg-border" />
-              <button 
+              <button
                 onClick={() => setShowLowStockOnly(!showLowStockOnly)}
                 className={`flex items-center gap-2 p-1.5 -m-1.5 rounded-lg transition-colors cursor-pointer ${showLowStockOnly ? "bg-amber-100/50 dark:bg-amber-900/20 ring-1 ring-amber-200 dark:ring-amber-800" : "hover:bg-muted/50"}`}
               >

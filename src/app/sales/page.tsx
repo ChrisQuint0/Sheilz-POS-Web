@@ -231,7 +231,7 @@ export default function SalesHistoryPage() {
       setRowData(transactions);
     } catch (error: any) {
       console.error("Error fetching orders:", error);
-      toast.error("Failed to fetch transactions.");
+      toast.error("Failed to fetch transactions.", { duration: 1500 });
     } finally {
       setLoading(false);
     }
@@ -288,7 +288,7 @@ export default function SalesHistoryPage() {
       );
 
       if (!response.ok) {
-        toast.error("Failed to export data.");
+        toast.error("Failed to export data.", { duration: 1500 });
         setIsExporting(false);
         return;
       }
@@ -313,10 +313,10 @@ export default function SalesHistoryPage() {
       document.body.removeChild(a);
 
       setIsExportModalOpen(false);
-      toast.success("Sales history exported successfully.");
+      toast.success("Sales history exported successfully.", { duration: 1500 });
     } catch (error) {
       console.error("Export error:", error);
-      toast.error("An error occurred during export.");
+      toast.error("An error occurred during export.", { duration: 1500 });
     } finally {
       setIsExporting(false);
     }
@@ -389,13 +389,17 @@ export default function SalesHistoryPage() {
         .in("id", idsToDelete);
 
       if (error) {
-        toast.error(`Failed to delete transactions: ${error.message}`);
+        const errorMessage = error.message.includes("loyalty_log_order_id_fkey")
+          ? "Cannot delete transactions of customers in a loyalty program!"
+          : `Failed to delete transactions: ${error.message}`;
+        toast.error(errorMessage, { duration: 1500 });
         setAuthModal({ isOpen: false, actionType: "delete" });
         return;
       }
 
       toast.success(
         `${txsToDelete.length} transaction(s) deleted successfully.`,
+        { duration: 1500 },
       );
       setSelectedRows([]);
       fetchOrders();
@@ -411,12 +415,14 @@ export default function SalesHistoryPage() {
         .eq("id", targetTx.id);
 
       if (error) {
-        toast.error(`Failed to save changes: ${error.message}`);
+        toast.error(`Failed to save changes: ${error.message}`, {
+          duration: 1500,
+        });
         setAuthModal({ isOpen: false, actionType: "delete" });
         return;
       }
 
-      toast.success("Transaction updated successfully.");
+      toast.success("Transaction updated successfully.", { duration: 1500 });
       fetchOrders();
     }
 

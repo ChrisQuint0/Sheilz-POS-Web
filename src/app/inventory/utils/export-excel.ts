@@ -194,7 +194,7 @@ export async function exportInventoryToExcel(
     const statusCell = row.getCell("status");
     statusCell.font = { bold: true, color: { argb: getStatusColor(status) } };
 
-    // Highlight row slightly if below threshold
+    // Highlight stock value if below threshold
     if (status !== "Healthy") {
       row.getCell("currentStock").font = { bold: true, color: { argb: "FF991B1B" } };
     }
@@ -203,18 +203,18 @@ export async function exportInventoryToExcel(
   // Add auto filter to the table
   ws2.autoFilter = `A1:G${items.length + 1}`;
 
-  // Data Bar for Current Stock
+  // Add Data Bar Conditional Formatting on Column D (Current Stock)
+  
   ws2.addConditionalFormatting({
-    ref: `D2:D${items.length + 1}`,
-    rules: [
-      {
-        type: "dataBar",
-        cfvo: [{ type: "min" }, { type: "max" }],
-        // @ts-ignore
-        color: { argb: "FF86EFAC" }, // light green data bar
-      } as any,
-    ],
-  });
+  ref: `D2:D${items.length + 1}`,
+  rules: [
+    {
+      type: "dataBar",
+      cfvo: [{ type: "min" }, { type: "max" }],
+      color: { argb: PRIMARY_COLOR },
+    } as any,
+  ],
+});
 
   // --- Worksheet 3: Inventory by Category ---
   const ws3 = wb.addWorksheet("Inventory by Category");
