@@ -126,8 +126,8 @@ export function AppSidebar() {
       ].includes(item.title);
     }
     if (role === "Cashier") {
-      // Cashiers only see the dashboard and sales history (for current day viewing)
-      return ["Dashboard", "Sales History"].includes(item.title);
+      // Cashiers only see the dashboard, sales history, and customer management
+      return ["Dashboard", "Sales History", "Customer Management"].includes(item.title);
     }
     return false;
   });

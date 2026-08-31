@@ -43,14 +43,16 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "Manage Inventory",
     "Manage Sales History",
     "Manage Team Members",
+    "Manage Customers",
+    "Access Analytics",
+    "Access Diagnostics",
+    "Access Audit Logs",
     "Reset Passwords",
     "Create Users",
     "Delete Users",
     "Edit Historical Sales Records",
     "Delete Historical Sales Records",
-    "Void Transactions",
-    "Access Analytics",
-    "Access Audit Logs"
+    "Void Transactions"
   ],
   Manager: [
     "Access Web Dashboard",
@@ -59,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "View Inventory",
     "Update Inventory",
     "View Team Members",
+    "Manage Customers",
     "View Analytics",
     "Void Transactions"
   ],
@@ -66,6 +69,7 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "Access Mobile POS",
     "Create Orders",
     "Process Payments",
-    "View Current-Day Transactions"
+    "View Current-Day Transactions",
+    "Manage Customers"
   ]
 };
