@@ -293,17 +293,27 @@ export default function SalesHistoryPage() {
         return;
       }
 
+      const contentDisposition = response.headers.get("content-disposition");
+      let filename = "Sales_History.xlsx";
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "Sales_Report.xlsx";
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
       setIsExportModalOpen(false);
+      toast.success("Sales history exported successfully.");
     } catch (error) {
       console.error("Export error:", error);
       toast.error("An error occurred during export.");

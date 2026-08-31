@@ -20,6 +20,7 @@ export interface ErrorLogEntry {
   module: string;
   severity: string;
   message: string;
+  status?: string;
 }
 
 // ---- Database Health ----

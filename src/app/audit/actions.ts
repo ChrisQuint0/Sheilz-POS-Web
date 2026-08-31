@@ -226,7 +226,15 @@ function getCategoryForAction(action: string): import('./data').AuditCategory {
     case 'Password Reset':
       return 'Authentication';
     case 'Report Exported':
+    case 'Dashboard Exported':
       return 'Analytics';
+    case 'Analytics Exported':
+      return 'Analytics';
+    case 'Sales History Exported':
+      return 'Sales';
+    case 'Diagnostic Exported':
+    case 'Audit Logs Exported':
+      return 'System';
     default:
       return 'System';
   }

@@ -24,13 +24,13 @@ function AnalyticsDashboard() {
   const handleExportExcel = async () => {
     exportToExcel(data, filters, { voidType, inventoryTurnover: activeInventoryTurnover, selectedIngredientName });
     const { logAppEvent } = await import('@/app/audit/actions');
-    logAppEvent("Report Exported", "Low", "Report", "Analytics_Report.xlsx", null).catch(console.error);
+    logAppEvent("Analytics Exported", "Low", "Report", "Analytics_Report.xlsx", null).catch(console.error);
   };
 
   const handleExportCharts = async () => {
     await exportChartsToPDF(data, filters, { voidType, inventoryTurnover: activeInventoryTurnover, selectedIngredientName });
     const { logAppEvent } = await import('@/app/audit/actions');
-    logAppEvent("Report Exported", "Low", "Report", "Sheilz_Analytics_Charts.pdf", null).catch(console.error);
+    logAppEvent("Analytics Exported", "Low", "Report", "Sheilz_Analytics_Charts.pdf", null).catch(console.error);
   };
 
   return (

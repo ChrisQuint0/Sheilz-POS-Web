@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
 import { AuditLog, AUDIT_CATEGORIES, AUDIT_ACTIONS, AUDIT_SEVERITIES } from "./data"
-import { fetchAuditLogs, fetchAuditUsers, type AuditFilters } from "./actions"
+import { fetchAuditLogs, fetchAuditUsers, logAppEvent, type AuditFilters } from "./actions"
+import { toast } from "sonner"
 import { AuditDesktopGrid } from "./components/audit-desktop-grid"
 import { AuditMobileList } from "./components/audit-mobile-list"
 import { AuditDetailsDrawer } from "./components/audit-details-drawer"
@@ -163,17 +164,38 @@ export default function AuditPage() {
     try {
       const result = await fetchAuditLogs(exportFilters)
       if (result.success && result.data) {
+        const isoDate = new Date().toISOString().split("T")[0];
+        let filename = `Audit_Logs_${isoDate}.${exportFormat === "xlsx" ? "xlsx" : "csv"}`;
         if (exportFormat === "xlsx") {
+          if (exportFilters.category && exportFilters.category !== "All") {
+            filename = `Audit_Logs_${exportFilters.category.replace(/\s+/g, "_")}.xlsx`;
+          } else if (exportFilters.severity && exportFilters.severity !== "All") {
+            filename = `Audit_Logs_${exportFilters.severity}_Severity.xlsx`;
+          }
           await exportAuditToExcel(result.data.logs, exportFilters, new Date(), userOptions);
         } else {
           exportAuditToCSV(result.data.logs);
         }
+
+        await logAppEvent('Audit Logs Exported', 'Low', 'Report', filename, {
+          metadata: {
+            format: exportFormat,
+            preset,
+            startDate: startDate || null,
+            endDate: endDate || null,
+            rowCount: result.data.logs.length,
+          }
+        });
+
+        loadLogs(true);
+        toast.success(`Audit logs exported successfully.`);
       } else {
-        // Handle error visually if necessary
         console.error("Export failed", result.error);
+        toast.error("Failed to export audit logs.");
       }
     } catch (e) {
       console.error(e);
+      toast.error("An error occurred during export.");
     } finally {
       setIsExporting(false)
       setIsExportModalOpen(false)

@@ -90,6 +90,19 @@ export async function GET(request: Request) {
       emptySheet.addRow(["No transaction records were found for the selected filters."]);
       
       const buf = await workbook.xlsx.writeBuffer();
+      try {
+        const { logAppEvent } = await import('@/app/audit/actions');
+        await logAppEvent('Sales History Exported', 'Low', 'Report', `${filenameStr}.xlsx`, {
+          metadata: {
+            preset,
+            startDate: startDate || null,
+            endDate: endDate || null,
+            rowsExported: 0,
+          }
+        });
+      } catch (logErr) {
+        console.error('Failed to log sales history export:', logErr);
+      }
       return new NextResponse(buf as ArrayBuffer, {
         status: 200,
         headers: {
@@ -352,15 +365,19 @@ export async function GET(request: Request) {
 
     const buf = await workbook.xlsx.writeBuffer();
     
-    const { logAppEvent } = await import('@/app/audit/actions');
-    await logAppEvent('Report Exported', 'Low', 'Report', `${filenameStr}.xlsx`, {
-      metadata: {
-        preset,
-        startDate: startDate || null,
-        endDate: endDate || null,
-        rowsExported: filteredData.length,
-      }
-    });
+    try {
+      const { logAppEvent } = await import('@/app/audit/actions');
+      await logAppEvent('Sales History Exported', 'Low', 'Report', `${filenameStr}.xlsx`, {
+        metadata: {
+          preset,
+          startDate: startDate || null,
+          endDate: endDate || null,
+          rowsExported: filteredData.length,
+        }
+      });
+    } catch (logErr) {
+      console.error('Failed to log sales history export:', logErr);
+    }
 
     return new NextResponse(buf as ArrayBuffer, {
       status: 200,

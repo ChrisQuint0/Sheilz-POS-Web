@@ -61,6 +61,11 @@ export default function DiagnosticsPage() {
       dbHealth,
       dbPerformance,
     });
+    
+    import('@/app/audit/actions').then(({ logAppEvent }) => {
+      logAppEvent('Diagnostic Exported', 'Low', 'Report', 'Sheilz_Diagnostics_Report.pdf', null)
+        .catch(console.error);
+    });
   };
 
   return (

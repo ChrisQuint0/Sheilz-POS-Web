@@ -27,8 +27,11 @@ export type AuditAction =
   | "Product Created" | "Product Updated" | "Product Archived" | "Product Restored" | "Product Deleted"
   // System
   | "Settings Updated" | "Backup Created"
+  | "Diagnostic Exported" | "Audit Logs Exported"
   // Analytics
-  | "Report Exported"
+  | "Report Exported" | "Dashboard Exported" | "Analytics Exported"
+  // Sales
+  | "Sales History Exported"
 
 export type AuditTargetType =
   | "User" | "Transaction" | "Ingredient" | "Inventory"
@@ -85,7 +88,7 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   "User Deactivated", "User Reactivated", "User Deleted",
   "Product Created", "Product Updated", "Product Archived", "Product Restored", "Product Deleted",
   "Settings Updated", "Backup Created",
-  "Report Exported"
+  "Report Exported", "Dashboard Exported", "Analytics Exported", "Diagnostic Exported", "Audit Logs Exported", "Sales History Exported"
 ]
 
 export const AUDIT_SEVERITIES: AuditSeverity[] = [

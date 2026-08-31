@@ -493,6 +493,12 @@ export default function Dashboard() {
         profileName: profile?.display_name || "Administrator",
       });
       
+      import('@/app/audit/actions').then(({ logAppEvent }) => {
+        logAppEvent('Dashboard Exported', 'Low', 'Report', 'Sheilz_Dashboard_Report.pdf', {
+          metadata: { dayOffset, exportedBy: profile?.display_name || "Administrator" }
+        }).catch(console.error);
+      });
+      
       toast.success("Dashboard report generated successfully!");
     } catch (err) {
       console.error("Export error:", err);

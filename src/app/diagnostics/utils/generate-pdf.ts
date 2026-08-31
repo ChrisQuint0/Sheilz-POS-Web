@@ -252,7 +252,7 @@ export const generateDiagnosticsPDF = (data: DiagnosticsPDFData) => {
     log.module,
     log.severity,
     log.message,
-    log.status
+    log.status || ""
   ]);
 
   autoTable(doc, {
