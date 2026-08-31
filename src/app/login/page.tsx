@@ -46,14 +46,23 @@ function LoginForm() {
       return;
     }
 
-    // Check if the user's profile is active
+    // Check if the user's profile is active and not a customer
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('status, display_name')
+        .select('status, display_name, role')
         .eq('id', user.id)
         .single();
+
+      if (profile?.role === 'Customer') {
+        // Sign the user out immediately
+        await supabase.auth.signOut();
+
+        setError('Invalid login credentials');
+        setIsLoading(false);
+        return;
+      }
 
       if (profile?.status === 'Inactive') {
         // Log the inactive login attempt before signing out
