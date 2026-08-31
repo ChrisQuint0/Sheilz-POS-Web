@@ -1,4 +1,4 @@
-export type Role = 'Administrator' | 'Manager' | 'Cashier';
+export type Role = 'Administrator' | 'Manager' | 'Cashier' | 'Customer';
 export type Status = 'Active' | 'Inactive';
 
 export interface Profile {

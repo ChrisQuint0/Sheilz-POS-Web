@@ -71,6 +71,7 @@ export async function fetchTeamMembers(): Promise<
   const { data, error } = await supabase
     .from('profiles')
     .select('id, display_name, email, avatar_url, role, status, last_login, created_at')
+    .filter('role', 'not.eq', 'Customer')
     .order('created_at', { ascending: true });
 
   if (error) {
