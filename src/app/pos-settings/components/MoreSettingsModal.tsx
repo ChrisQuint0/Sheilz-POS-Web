@@ -24,6 +24,7 @@ import {
   X,
   ImagePlus,
   ImageOff,
+  Package,
 } from "lucide-react";
 import { createClient } from "@/app/lib/supabase/client";
 import {
@@ -74,6 +75,31 @@ export function MoreSettingsModal({
   const [uploadingPaymentId, setUploadingPaymentId] = useState<string | null>(
     null,
   );
+
+  // --- Active tab (controlled so we can lazy-load Packaging data) ---
+  const [activeTab, setActiveTab] = useState("categories");
+
+  // --- Packaging tab state ---
+  // One toggle per ingredient applies to every product_recipes row using
+  // that ingredient (confirmed with Ipei: bulk, not per-variant), so the
+  // list is grouped by inventory_item_id with every variant it's used in
+  // shown underneath for context.
+  type PackagingUsage = {
+    productName: string;
+    sizeName: string | null;
+    tempName: string | null;
+  };
+  type PackagingIngredient = {
+    inventoryItemId: string;
+    name: string;
+    isPackaging: boolean;
+    usages: PackagingUsage[];
+  };
+  const [packagingIngredients, setPackagingIngredients] = useState<
+    PackagingIngredient[]
+  >([]);
+  const [packagingLoaded, setPackagingLoaded] = useState(false);
+  const [packagingLoading, setPackagingLoading] = useState(false);
 
   const supabase = createClient();
 
@@ -392,6 +418,105 @@ export function MoreSettingsModal({
     setDraggedIdx(null);
   };
 
+  // --- Packaging handlers ---
+  const fetchPackagingData = async () => {
+    setPackagingLoading(true);
+    try {
+      const { data, error } = await supabase.from("product_recipes").select(`
+          inventory_item_id,
+          is_packaging,
+          products ( name ),
+          product_variants ( sizes ( name ), temperatures ( name ) ),
+          inventory_items ( name )
+        `);
+
+      if (error) throw error;
+
+      const grouped = new Map<string, PackagingIngredient>();
+      (data || []).forEach((row: any) => {
+        const key = row.inventory_item_id;
+        const usage: PackagingUsage = {
+          productName: row.products?.name ?? "Unknown product",
+          sizeName: row.product_variants?.sizes?.name ?? null,
+          tempName: row.product_variants?.temperatures?.name ?? null,
+        };
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.usages.push(usage);
+          if (row.is_packaging) existing.isPackaging = true;
+        } else {
+          grouped.set(key, {
+            inventoryItemId: key,
+            name: row.inventory_items?.name ?? "Unknown ingredient",
+            isPackaging: !!row.is_packaging,
+            usages: [usage],
+          });
+        }
+      });
+
+      setPackagingIngredients(
+        Array.from(grouped.values()).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      );
+      setPackagingLoaded(true);
+    } catch (err) {
+      console.error("Error fetching packaging data:", err);
+      toast.error("Failed to load packaging data", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setPackagingLoading(false);
+    }
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (value === "packaging" && !packagingLoaded) {
+      fetchPackagingData();
+    }
+  };
+
+  const handleTogglePackaging = async (
+    inventoryItemId: string,
+    value: boolean,
+  ) => {
+    setIsLoading(true);
+    try {
+      // .select() + row-count check so an RLS block (or any other silent
+      // no-op) surfaces as a loud failure instead of the toggle appearing
+      // to succeed locally while nothing actually changed remotely.
+      const { data, error } = await supabase
+        .from("product_recipes")
+        .update({ is_packaging: value })
+        .eq("inventory_item_id", inventoryItemId)
+        .select("id");
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          "No recipe rows were updated — check permissions for this ingredient.",
+        );
+      }
+
+      setPackagingIngredients((prev) =>
+        prev.map((ing) =>
+          ing.inventoryItemId === inventoryItemId
+            ? { ...ing, isPackaging: value }
+            : ing,
+        ),
+      );
+      toast.success(value ? "Marked as packaging" : "Unmarked as packaging");
+    } catch (err) {
+      console.error("Error updating packaging flag:", err);
+      toast.error("Failed to update packaging flag", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- Size handlers ---
   const handleAddSize = async () => {
     if (!newSizeName.trim()) return;
@@ -578,7 +703,8 @@ export function MoreSettingsModal({
         </DialogHeader>
 
         <Tabs
-          defaultValue="categories"
+          value={activeTab}
+          onValueChange={handleTabChange}
           className="w-full flex-1 flex flex-col min-h-0 overflow-hidden"
         >
           <div className="px-6 border-b border-gray-100 shrink-0">
@@ -609,6 +735,12 @@ export function MoreSettingsModal({
                 className="px-4 h-full text-sm font-medium gap-2"
               >
                 <Thermometer className="w-4 h-4" /> Temperatures
+              </TabsTrigger>
+              <TabsTrigger
+                value="packaging"
+                className="px-4 h-full text-sm font-medium gap-2"
+              >
+                <Package className="w-4 h-4" /> Packaging
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1075,6 +1207,72 @@ export function MoreSettingsModal({
                   </div>
                 )}
               </div>
+            </TabsContent>
+
+            {/* Packaging */}
+            <TabsContent
+              value="packaging"
+              className="m-0 space-y-5 outline-none"
+            >
+              <div>
+                <h3 className="font-bold text-lg text-[#3a2b27]">
+                  Packaging Items
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Mark ingredients that are only used for Take-Out (cups, lids,
+                  straws). Toggling one on applies to every recipe it appears in
+                  — no need to edit each product individually. Dine-In orders
+                  skip deducting these; Take-Out orders don't.
+                </p>
+              </div>
+
+              {packagingLoading ? (
+                <div className="p-8 text-center text-gray-400 text-sm">
+                  Loading ingredients...
+                </div>
+              ) : (
+                <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 shadow-sm">
+                  {packagingIngredients.map((ing) => (
+                    <div
+                      key={ing.inventoryItemId}
+                      className="flex items-start justify-between gap-4 px-4 py-3.5 hover:bg-gray-50/80 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-sm text-[#3a2b27]">
+                          {ing.name}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {ing.usages.map((u, i) => (
+                            <span
+                              key={i}
+                              className="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5"
+                            >
+                              {u.productName}
+                              {u.sizeName ? ` · ${u.sizeName}` : ""}
+                              {u.tempName ? ` · ${u.tempName}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <Switch
+                        checked={ing.isPackaging}
+                        onCheckedChange={(c) =>
+                          handleTogglePackaging(ing.inventoryItemId, c)
+                        }
+                        disabled={isLoading}
+                        className="shrink-0 mt-0.5"
+                      />
+                    </div>
+                  ))}
+                  {packagingIngredients.length === 0 && (
+                    <div className="p-8 text-center text-gray-400 text-sm">
+                      No ingredients are used in any recipe yet. Add ingredients
+                      to a product's recipe first, then mark the packaging ones
+                      here.
+                    </div>
+                  )}
+                </div>
+              )}
             </TabsContent>
           </div>
         </Tabs>

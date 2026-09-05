@@ -456,6 +456,26 @@ export default function POSSettingsPage() {
     });
 
     // ── 4. Sync `product_recipes` using variant IDs ──────────────────────
+    // Packaging flags (is_packaging) are set globally per-ingredient via the
+    // Packaging tab in More Settings, not per-product here. Since this step
+    // deletes and reinserts every recipe row for this product, we look up
+    // which ingredients are currently flagged as packaging (anywhere, incl.
+    // this product's own existing rows) BEFORE deleting, so the reinsert can
+    // carry those flags forward instead of silently resetting them to false.
+    const { data: packagingRows, error: packagingFetchError } = await supabase
+      .from("product_recipes")
+      .select("inventory_item_id")
+      .eq("is_packaging", true);
+
+    if (packagingFetchError) {
+      alert("Failed to save recipes: " + packagingFetchError.message);
+      return;
+    }
+
+    const packagingIngredientIds = new Set(
+      (packagingRows || []).map((r) => r.inventory_item_id),
+    );
+
     // Delete all existing recipes for this product
     const { error: deleteRecipesError } = await supabase
       .from("product_recipes")
@@ -475,6 +495,7 @@ export default function POSSettingsPage() {
       inventory_item_id: string;
       quantity: number;
       unit: string;
+      is_packaging: boolean;
     }> = [];
 
     // Iterate through all recipe entries from the UI
@@ -503,6 +524,7 @@ export default function POSSettingsPage() {
             inventory_item_id: ingredient.ingredientId,
             quantity: quantity,
             unit: ingredient.unit || "",
+            is_packaging: packagingIngredientIds.has(ingredient.ingredientId),
           });
         }
       }
