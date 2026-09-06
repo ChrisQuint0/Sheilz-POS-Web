@@ -158,7 +158,7 @@ export default function SalesHistoryPage() {
           cashier_name, cash_tendered, change_amount, created_by, 
           created_at, last_modified_by, last_modified_at,
           order_items (
-            product_id, name, quantity, size, temperature, unit_price, subtotal
+            product_id, name, quantity, size, temperature, uses_packaging, unit_price, subtotal
           )
         `,
         { count: "exact" },
@@ -224,8 +224,15 @@ export default function SalesHistoryPage() {
           qty: i.quantity,
           size: i.size ?? "",
           temperature: i.temperature ?? "",
+          usesPackaging: Boolean(i.uses_packaging),
           unitPrice: i.unit_price ?? 0,
         })),
+        orderType:
+          (order.order_items ?? []).filter((i: any) => i.uses_packaging)
+            .length >
+          (order.order_items ?? []).filter((i: any) => !i.uses_packaging).length
+            ? "Take-Out"
+            : "Dine-In",
       }));
 
       setRowData(transactions);
@@ -334,6 +341,7 @@ export default function SalesHistoryPage() {
         amount: newTx.amount,
         payment_method: newTx.paymentMethod,
         cashier_name: newTx.cashier,
+        created_at: newTx.createdAt,
       })
       .select("id")
       .single();
@@ -349,6 +357,7 @@ export default function SalesHistoryPage() {
       name: item.name,
       size: item.size || null,
       temperature: item.temperature || null,
+      uses_packaging: item.usesPackaging,
       quantity: item.qty,
       unit_price: item.unitPrice,
       subtotal: item.unitPrice * item.qty,
@@ -450,6 +459,7 @@ export default function SalesHistoryPage() {
         minWidth: 180,
       },
       { field: "customerName", headerName: "Customer", minWidth: 150 },
+      { field: "orderType", headerName: "Order Type", minWidth: 120 },
       {
         field: "status",
         headerName: "Status",

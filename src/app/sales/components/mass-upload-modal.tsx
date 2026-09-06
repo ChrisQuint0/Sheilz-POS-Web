@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,8 @@ import {
   Package,
   Eraser,
   AlertTriangle,
+  CalendarDays,
+  Clock3,
 } from "lucide-react";
 import { OrderStatus, PaymentMethod, Transaction, OrderItem } from "../data";
 import { Product } from "./product-catalog";
@@ -48,6 +51,8 @@ interface FormOrderItem {
   productName: string;
   size: string | null;
   temp: string | null;
+  usesPackaging: boolean;
+  hasDiscount: boolean;
   qty: number;
   unitPrice: number;
 }
@@ -57,6 +62,8 @@ type UploadStatus = "draft" | "uploading" | "uploaded" | "failed";
 interface DraftOrder {
   draftId: string;
   customerName: string;
+  orderDate: string;
+  orderTime: string;
   status: OrderStatus;
   paymentMethod: string;
   items: FormOrderItem[];
@@ -96,6 +103,13 @@ function loadDrafts(): DraftOrder[] {
     // Reset any stale "uploading" status back to "draft"
     return parsed.map((d) => ({
       ...d,
+      orderDate: d.orderDate ?? getCurrentDate(),
+      orderTime: d.orderTime ?? getCurrentTime(),
+      items: d.items.map((item) => ({
+        ...item,
+        usesPackaging: item.usesPackaging ?? false,
+        hasDiscount: item.hasDiscount ?? false,
+      })),
       uploadStatus: d.uploadStatus === "uploading" ? "draft" : d.uploadStatus,
     }));
   } catch {
@@ -113,10 +127,22 @@ function makeItemId() {
   return `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getCurrentDate() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getCurrentTime() {
+  const date = new Date();
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 function blankDraft(paymentDefault: string): DraftOrder {
   return {
     draftId: makeDraftId(),
     customerName: "",
+    orderDate: getCurrentDate(),
+    orderTime: getCurrentTime(),
     status: "Completed",
     paymentMethod: paymentDefault || "Cash",
     items: [],
@@ -125,7 +151,14 @@ function blankDraft(paymentDefault: string): DraftOrder {
 }
 
 function calcTotal(items: FormOrderItem[]): number {
-  return items.reduce((sum, i) => sum + i.unitPrice * i.qty, 0);
+  return items.reduce(
+    (sum, i) => sum + i.unitPrice * i.qty * (i.hasDiscount ? 0.8 : 1),
+    0,
+  );
+}
+
+function discountedUnitPrice(item: FormOrderItem): number {
+  return item.unitPrice * (item.hasDiscount ? 0.8 : 1);
 }
 
 function itemsSummary(items: FormOrderItem[]): string {
@@ -240,7 +273,7 @@ export function MassUploadModal({
   // ── Draft CRUD ─────────────────────────────────────────────────────────────
 
   const addDraft = () => {
-    const d = blankDraft(paymentMethods[0] || "Cash");
+    const d = blankDraft("Cash");
     setDrafts((prev) => [...prev, d]);
     setExpandedId(d.draftId);
   };
@@ -283,6 +316,8 @@ export function MassUploadModal({
                   productName: "",
                   size: null,
                   temp: null,
+                  usesPackaging: false,
+                  hasDiscount: false,
                   qty: 1,
                   unitPrice: 0,
                 },
@@ -376,10 +411,7 @@ export function MassUploadModal({
 
     for (const draft of toUpload) {
       // Validate
-      if (
-        draft.items.length === 0 ||
-        draft.items.some((i) => !i.productName)
-      ) {
+      if (draft.items.length === 0 || draft.items.some((i) => !i.productName)) {
         setDrafts((prev) =>
           prev.map((d) =>
             d.draftId === draft.draftId
@@ -406,13 +438,14 @@ export function MassUploadModal({
 
       try {
         // Generate Order ID
-        const date = new Date();
+        const date = new Date(`${draft.orderDate}T${draft.orderTime}`);
         const yyyy = date.getFullYear();
         const mm = String(date.getMonth() + 1).padStart(2, "0");
         const dd = String(date.getDate()).padStart(2, "0");
-        const randomSuffix = String(
-          Math.floor(Math.random() * 1000),
-        ).padStart(3, "0");
+        const randomSuffix = String(Math.floor(Math.random() * 1000)).padStart(
+          3,
+          "0",
+        );
         const orderId = `${yyyy}${mm}${dd}-${randomSuffix}`;
 
         const finalCustomerName =
@@ -429,6 +462,7 @@ export function MassUploadModal({
             amount,
             payment_method: draft.paymentMethod,
             cashier_name: currentUser,
+            created_at: date.toISOString(),
           })
           .select("id, order_id, created_at")
           .single();
@@ -442,9 +476,10 @@ export function MassUploadModal({
           name: item.productName,
           size: item.size || null,
           temperature: item.temp || null,
+          uses_packaging: item.usesPackaging,
           quantity: item.qty,
-          unit_price: item.unitPrice,
-          subtotal: item.unitPrice * item.qty,
+          unit_price: discountedUnitPrice(item),
+          subtotal: discountedUnitPrice(item) * item.qty,
         }));
 
         const { error: itemsError } = await supabase
@@ -459,14 +494,20 @@ export function MassUploadModal({
           orderId: orderData.order_id,
           createdAt: orderData.created_at,
           customerName: finalCustomerName,
+          orderType:
+            draft.items.filter((item) => item.usesPackaging).length >
+            draft.items.filter((item) => !item.usesPackaging).length
+              ? "Take-Out"
+              : "Dine-In",
           status: draft.status,
           items: draft.items.map((item) => ({
             productId: item.productId ?? undefined,
             name: item.productName,
             size: item.size ?? "",
             temperature: item.temp ?? "",
+            usesPackaging: item.usesPackaging,
             qty: item.qty,
-            unitPrice: item.unitPrice,
+            unitPrice: discountedUnitPrice(item),
           })),
           amount,
           paymentMethod: draft.paymentMethod,
@@ -818,7 +859,7 @@ function DraftCard({
       {isExpanded && (
         <div className="px-4 pb-4 pt-1 border-t space-y-4">
           {/* Top fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">
                 Customer Name
@@ -830,6 +871,37 @@ function DraftCard({
                 disabled={!isEditable}
                 className="h-9"
               />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Order Date
+              </Label>
+              <div className="relative">
+                <CalendarDays className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="date"
+                  className="h-9 pl-9"
+                  value={draft.orderDate}
+                  onChange={(e) => onUpdate({ orderDate: e.target.value })}
+                  disabled={!isEditable}
+                  max={getCurrentDate()}
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Order Time
+              </Label>
+              <div className="relative">
+                <Clock3 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="time"
+                  className="h-9 pl-9"
+                  value={draft.orderTime}
+                  onChange={(e) => onUpdate({ orderTime: e.target.value })}
+                  disabled={!isEditable}
+                />
+              </div>
             </div>
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>
@@ -964,7 +1036,7 @@ function DraftItemRow({
     new Set(validVariantsForSize.map((v) => v.temp).filter(Boolean)),
   ) as string[];
 
-  const subtotal = item.unitPrice * item.qty;
+  const subtotal = discountedUnitPrice(item) * item.qty;
 
   return (
     <div className="flex flex-col gap-2 p-3 border rounded-lg bg-background/50 relative">
@@ -972,21 +1044,33 @@ function DraftItemRow({
         <span className="text-xs font-medium text-muted-foreground">
           Item {itemIdx + 1}
         </span>
-        {!disabled && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={onRemove}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              checked={item.hasDiscount}
+              onCheckedChange={(checked) =>
+                onUpdate("hasDiscount", checked === true)
+              }
+              disabled={disabled}
+            />
+            PWD/Senior Discount (20%)
+          </label>
+          {!disabled && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={onRemove}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-3 items-end">
         {/* Product */}
-        <div className="col-span-2 sm:col-span-4 space-y-1">
+        <div className="col-span-2 sm:col-span-2 space-y-1">
           <Label className="text-xs text-muted-foreground">Product</Label>
           <Select
             value={item.productName}
@@ -1062,6 +1146,26 @@ function DraftItemRow({
         ) : (
           <div className="sm:col-span-2" />
         )}
+
+        {/* Order type */}
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs text-muted-foreground">Order Type</Label>
+          <Select
+            value={item.usesPackaging ? "Take-Out" : "Dine-In"}
+            onValueChange={(value) =>
+              onUpdate("usesPackaging", value === "Take-Out")
+            }
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Order Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Dine-In">Dine-In</SelectItem>
+              <SelectItem value="Take-Out">Take-Out</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Qty */}
         <div className="sm:col-span-2 space-y-1">

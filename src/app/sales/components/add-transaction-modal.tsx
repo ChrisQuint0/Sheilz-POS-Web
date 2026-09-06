@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { OrderStatus, PaymentMethod, Transaction, OrderItem } from "../data";
 import { Product } from "./product-catalog";
 
@@ -29,6 +30,8 @@ interface FormOrderItem {
   productName: string;
   size: string | null;
   temp: string | null;
+  usesPackaging: boolean;
+  hasDiscount: boolean;
   qty: number;
   unitPrice: number;
 }
@@ -51,14 +54,24 @@ export function AddTransactionModal({
   products,
 }: AddTransactionModalProps) {
   const [customerName, setCustomerName] = useState("");
+  const [orderDate, setOrderDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  });
   const [status, setStatus] = useState<OrderStatus>("Completed");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [items, setItems] = useState<FormOrderItem[]>([]);
 
+  const discountedUnitPrice = (item: FormOrderItem) =>
+    item.unitPrice * (item.hasDiscount ? 0.8 : 1);
+
   const totalAmount = useMemo(() => {
-    return items.reduce((acc, item) => acc + item.unitPrice * item.qty, 0);
+    return items.reduce(
+      (acc, item) => acc + discountedUnitPrice(item) * item.qty,
+      0,
+    );
   }, [items]);
 
   const handleAddItem = () => {
@@ -70,6 +83,8 @@ export function AddTransactionModal({
         productName: "",
         size: null,
         temp: null,
+        usesPackaging: false,
+        hasDiscount: false,
         qty: 1,
         unitPrice: 0,
       },
@@ -123,7 +138,9 @@ export function AddTransactionModal({
 
   const handleSave = async () => {
     // Generate Order ID
-    const date = new Date();
+    const date = new Date(
+      `${orderDate}T${new Date().toTimeString().slice(0, 8)}`,
+    );
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, "0");
     const dd = String(date.getDate()).padStart(2, "0");
@@ -138,8 +155,9 @@ export function AddTransactionModal({
       name: item.productName,
       size: item.size ?? "",
       temperature: item.temp ?? "",
+      usesPackaging: item.usesPackaging,
       qty: item.qty,
-      unitPrice: item.unitPrice,
+      unitPrice: discountedUnitPrice(item),
     }));
 
     const finalCustomerName =
@@ -149,6 +167,11 @@ export function AddTransactionModal({
       orderId,
       createdAt: date.toISOString(),
       customerName: finalCustomerName,
+      orderType:
+        parsedItems.filter((item) => item.usesPackaging).length >
+        parsedItems.filter((item) => !item.usesPackaging).length
+          ? "Take-Out"
+          : "Dine-In",
       status,
       items:
         parsedItems.length > 0
@@ -158,6 +181,7 @@ export function AddTransactionModal({
                 name: "Unknown Item",
                 size: "",
                 temperature: "",
+                usesPackaging: false,
                 qty: 1,
                 unitPrice: 0,
               },
@@ -177,6 +201,10 @@ export function AddTransactionModal({
 
     // Reset form (only reached if onSave resolved without throwing)
     setCustomerName("");
+    const today = new Date();
+    setOrderDate(
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+    );
     setStatus("Completed");
     setPaymentMethod("Cash");
     setItems([]);
@@ -198,7 +226,7 @@ export function AddTransactionModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pr-2 py-4 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="customerName">Customer Name (Optional)</Label>
               <Input
@@ -207,6 +235,21 @@ export function AddTransactionModal({
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="orderDate">Order Date</Label>
+              <div className="relative">
+                <CalendarDays className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="orderDate"
+                  type="date"
+                  className="pl-9"
+                  value={orderDate}
+                  onChange={(e) => setOrderDate(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                />
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -272,7 +315,7 @@ export function AddTransactionModal({
                   ),
                 ) as string[];
 
-                const itemPrice = item.unitPrice;
+                const itemPrice = discountedUnitPrice(item);
                 const subtotal = itemPrice * item.qty;
 
                 return (
@@ -284,20 +327,35 @@ export function AddTransactionModal({
                       <div className="font-semibold text-sm text-foreground/80">
                         Item {index + 1}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() =>
-                          setItems(items.filter((i) => i.id !== item.id))
-                        }
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Checkbox
+                            checked={item.hasDiscount}
+                            onCheckedChange={(checked) =>
+                              updateItem(
+                                item.id,
+                                "hasDiscount",
+                                checked === true,
+                              )
+                            }
+                          />
+                          PWD/Senior Discount (20%)
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() =>
+                            setItems(items.filter((i) => i.id !== item.id))
+                          }
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
-                      <div className="sm:col-span-4 space-y-1.5">
+                      <div className="sm:col-span-2 space-y-1.5">
                         <Label className="text-xs text-muted-foreground">
                           Product
                         </Label>
@@ -380,6 +438,30 @@ export function AddTransactionModal({
                       ) : (
                         <div className="sm:col-span-2"></div>
                       )}
+
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">
+                          Order Type
+                        </Label>
+                        <Select
+                          value={item.usesPackaging ? "Take-Out" : "Dine-In"}
+                          onValueChange={(v) =>
+                            updateItem(
+                              item.id,
+                              "usesPackaging",
+                              v === "Take-Out",
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Order Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Dine-In">Dine-In</SelectItem>
+                            <SelectItem value="Take-Out">Take-Out</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
                       <div className="sm:col-span-2 space-y-1.5">
                         <Label className="text-xs text-muted-foreground">
