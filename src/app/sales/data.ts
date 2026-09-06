@@ -1,4 +1,5 @@
 export type OrderStatus = "Completed" | "Void (Not Made)" | "Void (Consumed)";
+export type OrderType = "Dine-In" | "Take-Out";
 export type PaymentMethod = string;
 
 export type OrderItem = {
@@ -7,6 +8,7 @@ export type OrderItem = {
   qty: number;
   size: string;
   temperature: string;
+  usesPackaging: boolean;
   unitPrice: number;
 };
 
@@ -15,6 +17,7 @@ export interface Transaction {
   orderId: string;
   createdAt: string;
   customerName: string;
+  orderType: OrderType;
   status: OrderStatus;
   items: OrderItem[];
   amount: number;
