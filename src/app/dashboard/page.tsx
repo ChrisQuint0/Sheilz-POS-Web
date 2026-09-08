@@ -114,9 +114,9 @@ const chartOptions = {
       grid: { color: "rgba(194,69,106,0.06)" },
       border: { display: false },
       ticks: {
-        callback: (value: any) => `₱${(value / 1000).toFixed(0)}k`,
+        callback: (value: any) => formatChartCurrency(value),
         color: "#826f69",
-        font: { size: 11 },
+        font: { size: 12 },
       },
     },
     x: {
@@ -175,10 +175,12 @@ function timeAgo(dateStr: string): string {
   const diffMins = Math.floor(diffMs / 60000);
 
   if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+  if (diffMins < 60)
+    return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
 
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+  if (diffHours < 24)
+    return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
@@ -214,6 +216,19 @@ function formatCurrency(value: number): { whole: string; decimal: string } {
   return { whole: parts[0], decimal: `.${parts[1]}` };
 }
 
+function formatChartCurrency(value: number | string): string {
+  const numericValue = Number(value);
+  if (numericValue < 1000) {
+    return `₱${numericValue.toLocaleString("en-PH", {
+      maximumFractionDigits: 0,
+    })}`;
+  }
+
+  return `₱${(numericValue / 1000).toLocaleString("en-PH", {
+    maximumFractionDigits: 1,
+  })}k`;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -238,51 +253,55 @@ export default function Dashboard() {
         supabase.rpc("get_dashboard_revenue_trend", { p_day_offset: offset }),
         supabase.rpc("get_dashboard_kpis", { p_day_offset: offset }),
       ]);
-      
-      if (offset === 0 && kpisRes.error && kpisRes.error.code === 'PGRST202') {
+      if (offset === 0 && kpisRes.error && kpisRes.error.code === "PGRST202") {
         kpisRes = await supabase.rpc("get_dashboard_kpis");
       }
-      
+
       if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
-      if (isErrorObj(trendRes.error)) console.error("Revenue trend error:", trendRes.error);
+      if (isErrorObj(trendRes.error))
+        console.error("Revenue trend error:", trendRes.error);
 
       const hasKpisError = isErrorObj(kpisRes.error);
 
       // If the RPC call succeeded (meaning the backend migration is applied or offset is 0)
       if (!hasKpisError && kpisRes.data) {
         setKpis(kpisRes.data as DashboardKpis);
-      } 
+      }
       // Fallback: If the migration hasn't been deployed yet, compute KPIs in the frontend for offset !== 0
       else if (hasKpisError && offset !== 0) {
-        console.warn("RPC get_dashboard_kpis with offset failed, falling back to frontend computation.");
-        
+        console.warn(
+          "RPC get_dashboard_kpis with offset failed, falling back to frontend computation.",
+        );
+
         // Calculate Manila midnight timestamps for the week boundaries
         const now = new Date();
         const manilaFormatter = new Intl.DateTimeFormat("en-US", {
           timeZone: "Asia/Manila",
-          year: "numeric", month: "2-digit", day: "2-digit"
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
         });
         const parts = manilaFormatter.formatToParts(now);
-        const y = parseInt(parts.find(p => p.type === "year")!.value);
-        const m = parseInt(parts.find(p => p.type === "month")!.value) - 1;
-        const d = parseInt(parts.find(p => p.type === "day")!.value);
-        
+        const y = parseInt(parts.find((p) => p.type === "year")!.value);
+        const m = parseInt(parts.find((p) => p.type === "month")!.value) - 1;
+        const d = parseInt(parts.find((p) => p.type === "day")!.value);
+
         const manilaMidnight = new Date(Date.UTC(y, m, d, -8, 0, 0, 0)); // UTC time of Manila midnight
-        
+
         // Shift to Sunday of the current week
         const dayOfWeek = new Date(y, m, d).getDay(); // 0 is Sunday
         const baseStart = new Date(manilaMidnight);
         baseStart.setUTCDate(baseStart.getUTCDate() - dayOfWeek);
-        
+
         const currStart = new Date(baseStart);
         currStart.setUTCDate(currStart.getUTCDate() + offset);
-        
+
         const currEnd = new Date(currStart);
         currEnd.setUTCDate(currEnd.getUTCDate() + 7);
-        
+
         const prevStart = new Date(currStart);
         prevStart.setUTCDate(prevStart.getUTCDate() - 7);
-        
+
         const prevEnd = new Date(currStart);
 
         const [currOrdersRes, prevOrdersRes] = await Promise.all([
@@ -303,17 +322,30 @@ export default function Dashboard() {
         const currOrders = currOrdersRes.data || [];
         const prevOrders = prevOrdersRes.data || [];
 
-        const todayRevenue = currOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+        const todayRevenue = currOrders.reduce(
+          (sum, o) => sum + Number(o.amount),
+          0,
+        );
         const todayOrders = currOrders.length;
         const todayAvgOrder = todayOrders > 0 ? todayRevenue / todayOrders : 0;
 
-        const yestRevenue = prevOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+        const yestRevenue = prevOrders.reduce(
+          (sum, o) => sum + Number(o.amount),
+          0,
+        );
         const yestOrders = prevOrders.length;
         const yestAvgOrder = yestOrders > 0 ? yestRevenue / yestOrders : 0;
 
-        const revenueChange = yestRevenue > 0 ? ((todayRevenue - yestRevenue) / yestRevenue) * 100 : 0;
-        const ordersChange = yestOrders > 0 ? ((todayOrders - yestOrders) / yestOrders) * 100 : 0;
-        const aovChange = yestAvgOrder > 0 ? ((todayAvgOrder - yestAvgOrder) / yestAvgOrder) * 100 : 0;
+        const revenueChange =
+          yestRevenue > 0
+            ? ((todayRevenue - yestRevenue) / yestRevenue) * 100
+            : 0;
+        const ordersChange =
+          yestOrders > 0 ? ((todayOrders - yestOrders) / yestOrders) * 100 : 0;
+        const aovChange =
+          yestAvgOrder > 0
+            ? ((todayAvgOrder - yestAvgOrder) / yestAvgOrder) * 100
+            : 0;
 
         setKpis({
           today_revenue: todayRevenue,
@@ -356,23 +388,30 @@ export default function Dashboard() {
             .limit(5),
         ]);
 
-      if (kpisRes.error && kpisRes.error.code === 'PGRST202') {
+      if (kpisRes.error && kpisRes.error.code === "PGRST202") {
         kpisRes = await supabase.rpc("get_dashboard_kpis");
       }
 
       if (kpisRes.data) setKpis(kpisRes.data as DashboardKpis);
       if (trendRes.data) setRevenueTrend(trendRes.data as RevenueTrendDay[]);
-      if (lowStockRes.data) setLowStockItems(lowStockRes.data as LowStockItem[]);
+      if (lowStockRes.data)
+        setLowStockItems(lowStockRes.data as LowStockItem[]);
       if (alertCountRes.data !== null && alertCountRes.data !== undefined)
         setStockAlertCount(alertCountRes.data as number);
-      if (activityRes.data) setRecentActivity(activityRes.data as AuditLogEntry[]);
+      if (activityRes.data)
+        setRecentActivity(activityRes.data as AuditLogEntry[]);
 
       // Log errors for debugging
-      if (isErrorObj(kpisRes.error)) console.error("KPIs error:", kpisRes.error);
-      if (isErrorObj(trendRes.error)) console.error("Revenue trend error:", trendRes.error);
-      if (isErrorObj(lowStockRes.error)) console.error("Low stock error:", lowStockRes.error);
-      if (isErrorObj(alertCountRes.error)) console.error("Alert count error:", alertCountRes.error);
-      if (isErrorObj(activityRes.error)) console.error("Activity error:", activityRes.error);
+      if (isErrorObj(kpisRes.error))
+        console.error("KPIs error:", kpisRes.error);
+      if (isErrorObj(trendRes.error))
+        console.error("Revenue trend error:", trendRes.error);
+      if (isErrorObj(lowStockRes.error))
+        console.error("Low stock error:", lowStockRes.error);
+      if (isErrorObj(alertCountRes.error))
+        console.error("Alert count error:", alertCountRes.error);
+      if (isErrorObj(activityRes.error))
+        console.error("Activity error:", activityRes.error);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
     } finally {
@@ -436,19 +475,24 @@ export default function Dashboard() {
 
   // Find peak day
   const peakDay = revenueTrend.reduce<RevenueTrendDay | null>(
-    (max, d) => (!max || Number(d.total_revenue) > Number(max.total_revenue) ? d : max),
+    (max, d) =>
+      !max || Number(d.total_revenue) > Number(max.total_revenue) ? d : max,
     null,
   );
 
   const handleRestrictedLinkClick = (e: React.MouseEvent, path: string) => {
     if (profile?.role === "Cashier") {
       e.preventDefault();
-      toast.error("Insufficient Privileges: Your account does not have access to this section.");
+      toast.error(
+        "Insufficient Privileges: Your account does not have access to this section.",
+      );
       return;
     }
     if (profile?.role === "Manager" && path === "/audit") {
       e.preventDefault();
-      toast.error("Insufficient Privileges: Your account does not have access to this section.");
+      toast.error(
+        "Insufficient Privileges: Your account does not have access to this section.",
+      );
     }
   };
 
@@ -463,7 +507,7 @@ export default function Dashboard() {
 
       let logoImageBase64 = null;
       try {
-        const response = await fetch('/sheilz_pos_logo.png');
+        const response = await fetch("/sheilz_pos_logo.png");
         if (response.ok) {
           const blob = await response.blob();
           logoImageBase64 = await new Promise<string>((resolve, reject) => {
@@ -492,13 +536,22 @@ export default function Dashboard() {
         logoImageBase64,
         profileName: profile?.display_name || "Administrator",
       });
-      
-      import('@/app/audit/actions').then(({ logAppEvent }) => {
-        logAppEvent('Dashboard Exported', 'Low', 'Report', 'Sheilz_Dashboard_Report.pdf', {
-          metadata: { dayOffset, exportedBy: profile?.display_name || "Administrator" }
-        }).catch(console.error);
+
+      import("@/app/audit/actions").then(({ logAppEvent }) => {
+        logAppEvent(
+          "Dashboard Exported",
+          "Low",
+          "Report",
+          "Sheilz_Dashboard_Report.pdf",
+          {
+            metadata: {
+              dayOffset,
+              exportedBy: profile?.display_name || "Administrator",
+            },
+          },
+        ).catch(console.error);
       });
-      
+
       toast.success("Dashboard report generated successfully!");
     } catch (err) {
       console.error("Export error:", err);
@@ -551,7 +604,9 @@ export default function Dashboard() {
             onClick={handleExport}
             disabled={exporting}
           >
-            <Download className={`h-4 w-4 mr-1.5 ${exporting ? "animate-pulse" : ""}`} />
+            <Download
+              className={`h-4 w-4 mr-1.5 ${exporting ? "animate-pulse" : ""}`}
+            />
             {exporting ? "Exporting..." : "Export Data"}
           </Button>
         </div>
@@ -625,10 +680,11 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span
-                    className={`flex items-center text-xs font-semibold rounded-full px-2 py-0.5 ${(kpis?.orders_change ?? 0) >= 0
+                    className={`flex items-center text-xs font-semibold rounded-full px-2 py-0.5 ${
+                      (kpis?.orders_change ?? 0) >= 0
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-red-100 text-red-600"
-                      }`}
+                    }`}
                   >
                     {(kpis?.orders_change ?? 0) >= 0 ? (
                       <ArrowUpRight className="h-3 w-3 mr-0.5" />
@@ -639,7 +695,8 @@ export default function Dashboard() {
                     {kpis?.orders_change ?? 0}%
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    vs. {kpis?.yesterday_orders ?? 0} {dayOffset === 0 ? "yesterday" : "last week"}
+                    vs. {kpis?.yesterday_orders ?? 0}{" "}
+                    {dayOffset === 0 ? "yesterday" : "last week"}
                   </span>
                 </div>
               </>
@@ -673,10 +730,11 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span
-                    className={`flex items-center text-xs font-semibold rounded-full px-2 py-0.5 ${(kpis?.aov_change ?? 0) >= 0
+                    className={`flex items-center text-xs font-semibold rounded-full px-2 py-0.5 ${
+                      (kpis?.aov_change ?? 0) >= 0
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-red-100 text-red-600"
-                      }`}
+                    }`}
                   >
                     {(kpis?.aov_change ?? 0) >= 0 ? (
                       <ArrowUpRight className="h-3 w-3 mr-0.5" />
@@ -765,18 +823,21 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
-            {!loading && !trendLoading && peakDay && Number(peakDay.total_revenue) > 0 && (
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Peak day</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {peakDay.day_label} · ₱
-                  {Number(peakDay.total_revenue).toLocaleString("en-PH", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })}
-                </p>
-              </div>
-            )}
+            {!loading &&
+              !trendLoading &&
+              peakDay &&
+              Number(peakDay.total_revenue) > 0 && (
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Peak day</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {peakDay.day_label} · ₱
+                    {Number(peakDay.total_revenue).toLocaleString("en-PH", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}
+                  </p>
+                </div>
+              )}
           </CardHeader>
           <CardContent className="flex-1 min-h-[280px]">
             {loading ? (
@@ -797,8 +858,15 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : revenueTrend.length > 0 ? (
-              <div className="relative h-full w-full transition-opacity duration-200" style={{ opacity: trendLoading ? 0.7 : 1 }}>
-                <Line ref={chartRef} data={chartData} options={chartOptions as any} />
+              <div
+                className="relative h-full w-full transition-opacity duration-200"
+                style={{ opacity: trendLoading ? 0.7 : 1 }}
+              >
+                <Line
+                  ref={chartRef}
+                  data={chartData}
+                  options={chartOptions as any}
+                />
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
@@ -822,7 +890,12 @@ export default function Dashboard() {
                 size="sm"
                 className="text-xs text-primary p-0 h-auto"
                 nativeButton={false}
-                render={<Link href="/inventory?filter=low-stock" onClick={(e) => handleRestrictedLinkClick(e, "/inventory")} />}
+                render={
+                  <Link
+                    href="/inventory?filter=low-stock"
+                    onClick={(e) => handleRestrictedLinkClick(e, "/inventory")}
+                  />
+                }
               >
                 Manage →
               </Button>
@@ -854,7 +927,9 @@ export default function Dashboard() {
                     return (
                       <div key={item.item_id}>
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-medium">{item.item_name}</p>
+                          <p className="text-sm font-medium">
+                            {item.item_name}
+                          </p>
                           <span className="text-sm font-bold tabular-nums">
                             {item.current_stock}
                             <span className="text-xs font-normal text-muted-foreground">
@@ -947,7 +1022,12 @@ export default function Dashboard() {
                   size="sm"
                   className="text-sm text-primary hover:text-primary/80 p-0 h-auto w-full justify-center"
                   nativeButton={false}
-                  render={<Link href="/audit" onClick={(e) => handleRestrictedLinkClick(e, "/audit")} />}
+                  render={
+                    <Link
+                      href="/audit"
+                      onClick={(e) => handleRestrictedLinkClick(e, "/audit")}
+                    />
+                  }
                 >
                   View all activity
                 </Button>
