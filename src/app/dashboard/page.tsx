@@ -426,14 +426,14 @@ export default function Dashboard() {
 
   // Navigate days
   const goToPreviousPeriod = () => {
-    const newOffset = dayOffset - 7;
+    const newOffset = dayOffset - 1;
     setDayOffset(newOffset);
     fetchOffsetData(newOffset);
   };
 
   const goToNextPeriod = () => {
     if (dayOffset >= 0) return;
-    const newOffset = dayOffset + 7;
+    const newOffset = dayOffset + 1;
     setDayOffset(newOffset);
     fetchOffsetData(newOffset);
   };
