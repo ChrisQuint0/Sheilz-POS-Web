@@ -1,151 +1,226 @@
-"use client"
+"use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react"
-import { AuditLog, AUDIT_CATEGORIES, AUDIT_ACTIONS, AUDIT_SEVERITIES } from "./data"
-import { fetchAuditLogs, fetchAuditUsers, logAppEvent, type AuditFilters } from "./actions"
-import { toast } from "sonner"
-import { AuditDesktopGrid } from "./components/audit-desktop-grid"
-import { AuditMobileList } from "./components/audit-mobile-list"
-import { AuditDetailsDrawer } from "./components/audit-details-drawer"
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import {
+  AuditLog,
+  AUDIT_CATEGORIES,
+  AUDIT_ACTIONS,
+  AUDIT_SEVERITIES,
+} from "./data";
+import {
+  fetchAuditLogs,
+  fetchAuditUsers,
+  logAppEvent,
+  type AuditFilters,
+} from "./actions";
+import { toast } from "sonner";
+import { AuditDesktopGrid } from "./components/audit-desktop-grid";
+import { AuditMobileList } from "./components/audit-mobile-list";
+import { AuditDetailsDrawer } from "./components/audit-details-drawer";
 
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Search, Download, RefreshCw, Filter, Loader2 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ExportModal, type ExportDatePreset } from "./components/export-modal"
-import { exportAuditToExcel } from "./export-excel"
-import { exportAuditToCSV } from "./export-csv"
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Search,
+  Download,
+  RefreshCw,
+  Filter,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ExportModal, type ExportDatePreset } from "./components/export-modal";
+import { exportAuditToExcel } from "./export-excel";
+import { exportAuditToCSV } from "./export-csv";
 
-type DatePreset = "All" | "Today" | "Yesterday" | "Last 7 Days" | "Last 30 Days" | "Last 90 Days" | "This Month" | "Custom"
+type DatePreset =
+  | "All"
+  | "Today"
+  | "Yesterday"
+  | "Last 7 Days"
+  | "Last 30 Days"
+  | "Last 90 Days"
+  | "This Month"
+  | "Custom";
+
+const PAGE_SIZE = 20;
 
 export default function AuditPage() {
   // Data state
-  const [logs, setLogs] = useState<AuditLog[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Filter state
-  const [searchQuery, setSearchQuery] = useState("")
-  const [datePreset, setDatePreset] = useState<DatePreset>("All")
-  const [customStartDate, setCustomStartDate] = useState("")
-  const [customEndDate, setCustomEndDate] = useState("")
-  const [userFilter, setUserFilter] = useState<string>("All Users")
-  const [categoryFilter, setCategoryFilter] = useState<string>("All Categories")
-  const [actionFilter, setActionFilter] = useState<string>("All Actions")
-  const [severityFilter, setSeverityFilter] = useState<string>("All Severities")
+  const [searchQuery, setSearchQuery] = useState("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("Today");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [userFilter, setUserFilter] = useState<string>("All Users");
+  const [categoryFilter, setCategoryFilter] =
+    useState<string>("All Categories");
+  const [actionFilter, setActionFilter] = useState<string>("All Actions");
+  const [severityFilter, setSeverityFilter] =
+    useState<string>("All Severities");
 
   // User list for filter dropdown
-  const [userOptions, setUserOptions] = useState<{ id: string; name: string }[]>([])
+  const [userOptions, setUserOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
 
   // Export Modal State
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
-  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx" | null>(null)
-  const [isExporting, setIsExporting] = useState(false)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx" | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Drawer State
-  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Debounce timer for search
-  const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const handleFilterChange = <T,>(
+    setter: React.Dispatch<React.SetStateAction<T>>,
+    value: T,
+  ) => {
+    setter(value);
+    setPage(1);
+  };
 
   // Debounce search input
   useEffect(() => {
     if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current)
+      clearTimeout(searchTimerRef.current);
     }
     searchTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-    }, 400)
+      setDebouncedSearch(searchQuery);
+    }, 400);
     return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    }
-  }, [searchQuery])
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
 
   // Build filters object
   const buildFilters = useCallback((): AuditFilters => {
     return {
       search: debouncedSearch || undefined,
-      category: categoryFilter !== "All Categories" ? categoryFilter : undefined,
+      category:
+        categoryFilter !== "All Categories" ? categoryFilter : undefined,
       action: actionFilter !== "All Actions" ? actionFilter : undefined,
-      severity: severityFilter !== "All Severities" ? severityFilter : undefined,
+      severity:
+        severityFilter !== "All Severities" ? severityFilter : undefined,
       userId: userFilter !== "All Users" ? userFilter : undefined,
       datePreset: datePreset !== "All" ? datePreset : undefined,
       customStartDate: datePreset === "Custom" ? customStartDate : undefined,
       customEndDate: datePreset === "Custom" ? customEndDate : undefined,
-      page: 1,
-      pageSize: 500, // AG Grid handles client-side pagination from this set
-    }
-  }, [debouncedSearch, categoryFilter, actionFilter, severityFilter, userFilter, datePreset, customStartDate, customEndDate])
+      page,
+      pageSize: PAGE_SIZE,
+    };
+  }, [
+    debouncedSearch,
+    categoryFilter,
+    actionFilter,
+    severityFilter,
+    userFilter,
+    datePreset,
+    customStartDate,
+    customEndDate,
+    page,
+  ]);
 
   // Fetch data
-  const loadLogs = useCallback(async (showRefreshSpinner = false) => {
-    if (showRefreshSpinner) {
-      setIsRefreshing(true)
-    } else {
-      setIsLoading(true)
-    }
-    setError(null)
-
-    try {
-      const result = await fetchAuditLogs(buildFilters())
-      if (result.success && result.data) {
-        setLogs(result.data.logs)
-        setTotalCount(result.data.totalCount)
+  const loadLogs = useCallback(
+    async (showRefreshSpinner = false) => {
+      if (showRefreshSpinner) {
+        setIsRefreshing(true);
       } else {
-        setError(result.error ?? "Failed to load audit logs.")
+        setIsLoading(true);
       }
-    } catch {
-      setError("An unexpected error occurred.")
-    } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [buildFilters])
+      setError(null);
+
+      try {
+        const result = await fetchAuditLogs(buildFilters());
+        if (result.success && result.data) {
+          const lastPage = Math.max(
+            1,
+            Math.ceil(result.data.totalCount / PAGE_SIZE),
+          );
+          if (page > lastPage) {
+            setPage(lastPage);
+            return;
+          }
+          setLogs(result.data.logs);
+          setTotalCount(result.data.totalCount);
+        } else {
+          setError(result.error ?? "Failed to load audit logs.");
+        }
+      } catch {
+        setError("An unexpected error occurred.");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [buildFilters, page],
+  );
 
   // Fetch users for dropdown
   useEffect(() => {
     async function loadUsers() {
-      const result = await fetchAuditUsers()
+      const result = await fetchAuditUsers();
       if (result.success && result.data) {
-        setUserOptions(result.data)
+        setUserOptions(result.data);
       }
     }
-    loadUsers()
-  }, [])
+    loadUsers();
+  }, []);
 
   // Load logs on mount and when filters change
   useEffect(() => {
-    loadLogs()
-  }, [loadLogs])
+    loadLogs();
+  }, [loadLogs]);
 
   const handleLogSelect = (log: AuditLog) => {
-    setSelectedLog(log)
-    setIsDrawerOpen(true)
-  }
+    setSelectedLog(log);
+    setIsDrawerOpen(true);
+  };
 
   const handleRefresh = () => {
-    loadLogs(true)
-  }
+    loadLogs(true);
+  };
 
   const handleExportClick = (format: "csv" | "xlsx") => {
-    setExportFormat(format)
-    setIsExportModalOpen(true)
-  }
+    setExportFormat(format);
+    setIsExportModalOpen(true);
+  };
 
-  const handleExportExecute = async (startDate: string, endDate: string, preset: ExportDatePreset) => {
-    setIsExporting(true)
-    
+  const handleExportExecute = async (
+    startDate: string,
+    endDate: string,
+    preset: ExportDatePreset,
+  ) => {
+    setIsExporting(true);
+
     // Create new filters for export overriding the date preset
     const exportFilters: AuditFilters = {
       ...buildFilters(),
       page: 1,
       pageSize: 100000, // fetch as many as possible for export
-    }
-    
+    };
+
     if (preset === "All Time") {
       exportFilters.datePreset = undefined;
       exportFilters.customStartDate = undefined;
@@ -162,29 +237,37 @@ export default function AuditPage() {
     }
 
     try {
-      const result = await fetchAuditLogs(exportFilters)
+      const result = await fetchAuditLogs(exportFilters);
       if (result.success && result.data) {
         const isoDate = new Date().toISOString().split("T")[0];
         let filename = `Audit_Logs_${isoDate}.${exportFormat === "xlsx" ? "xlsx" : "csv"}`;
         if (exportFormat === "xlsx") {
           if (exportFilters.category && exportFilters.category !== "All") {
             filename = `Audit_Logs_${exportFilters.category.replace(/\s+/g, "_")}.xlsx`;
-          } else if (exportFilters.severity && exportFilters.severity !== "All") {
+          } else if (
+            exportFilters.severity &&
+            exportFilters.severity !== "All"
+          ) {
             filename = `Audit_Logs_${exportFilters.severity}_Severity.xlsx`;
           }
-          await exportAuditToExcel(result.data.logs, exportFilters, new Date(), userOptions);
+          await exportAuditToExcel(
+            result.data.logs,
+            exportFilters,
+            new Date(),
+            userOptions,
+          );
         } else {
           exportAuditToCSV(result.data.logs);
         }
 
-        await logAppEvent('Audit Logs Exported', 'Low', 'Report', filename, {
+        await logAppEvent("Audit Logs Exported", "Low", "Report", filename, {
           metadata: {
             format: exportFormat,
             preset,
             startDate: startDate || null,
             endDate: endDate || null,
             rowCount: result.data.logs.length,
-          }
+          },
         });
 
         loadLogs(true);
@@ -197,10 +280,10 @@ export default function AuditPage() {
       console.error(e);
       toast.error("An error occurred during export.");
     } finally {
-      setIsExporting(false)
-      setIsExportModalOpen(false)
+      setIsExporting(false);
+      setIsExportModalOpen(false);
     }
-  }
+  };
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background">
@@ -215,20 +298,36 @@ export default function AuditPage() {
               Audit Logs
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Review historical system activity, security events, and business-critical changes.
+              Review historical system activity, security events, and
+              business-critical changes.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <Button variant="outline" className="bg-background" onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <Button
+              variant="outline"
+              className="bg-background"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+              />
               Refresh Logs
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" className="bg-background" onClick={() => handleExportClick("csv")} disabled={logs.length === 0}>
+              <Button
+                variant="outline"
+                className="bg-background"
+                onClick={() => handleExportClick("csv")}
+                disabled={logs.length === 0}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 CSV
               </Button>
-              <Button onClick={() => handleExportClick("xlsx")} disabled={logs.length === 0}>
+              <Button
+                onClick={() => handleExportClick("xlsx")}
+                disabled={logs.length === 0}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Excel
               </Button>
@@ -247,11 +346,18 @@ export default function AuditPage() {
                 placeholder="Search user, target, email, or record ID..."
                 className="pl-9 h-9 text-sm"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) =>
+                  handleFilterChange(setSearchQuery, e.target.value)
+                }
               />
             </div>
 
-            <Select value={datePreset} onValueChange={(val) => setDatePreset(val as DatePreset)}>
+            <Select
+              value={datePreset}
+              onValueChange={(val) =>
+                handleFilterChange(setDatePreset, val as DatePreset)
+              }
+            >
               <SelectTrigger className="w-full sm:w-[160px] h-9">
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
@@ -273,13 +379,17 @@ export default function AuditPage() {
                   type="date"
                   className="h-9 w-[130px]"
                   value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange(setCustomStartDate, e.target.value)
+                  }
                 />
                 <Input
                   type="date"
                   className="h-9 w-[130px]"
                   value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange(setCustomEndDate, e.target.value)
+                  }
                 />
               </div>
             )}
@@ -290,43 +400,79 @@ export default function AuditPage() {
               <Filter className="h-3 w-3" /> Filters:
             </div>
 
-            <Select value={userFilter} onValueChange={(val) => setUserFilter(val ?? 'All Users')}>
+            <Select
+              value={userFilter}
+              onValueChange={(val) =>
+                handleFilterChange(setUserFilter, val ?? "All Users")
+              }
+            >
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="User" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All Users">All Users</SelectItem>
-                {userOptions.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                {userOptions.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val ?? 'All Categories')}>
+            <Select
+              value={categoryFilter}
+              onValueChange={(val) =>
+                handleFilterChange(setCategoryFilter, val ?? "All Categories")
+              }
+            >
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All Categories">All Categories</SelectItem>
-                {AUDIT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {AUDIT_CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <Select value={actionFilter} onValueChange={(val) => setActionFilter(val ?? 'All Actions')}>
+            <Select
+              value={actionFilter}
+              onValueChange={(val) =>
+                handleFilterChange(setActionFilter, val ?? "All Actions")
+              }
+            >
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Action Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All Actions">All Actions</SelectItem>
-                {AUDIT_ACTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                {AUDIT_ACTIONS.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <Select value={severityFilter} onValueChange={(val) => setSeverityFilter(val ?? 'All Severities')}>
+            <Select
+              value={severityFilter}
+              onValueChange={(val) =>
+                handleFilterChange(setSeverityFilter, val ?? "All Severities")
+              }
+            >
               <SelectTrigger className="w-auto h-8 text-xs">
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All Severities">All Severities</SelectItem>
-                {AUDIT_SEVERITIES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {AUDIT_SEVERITIES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -338,12 +484,18 @@ export default function AuditPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center border rounded-lg bg-card shadow-sm p-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">Loading audit logs...</p>
+            <p className="text-sm text-muted-foreground">
+              Loading audit logs...
+            </p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center border rounded-lg bg-card shadow-sm p-8">
-            <h3 className="text-lg font-medium text-destructive">Error loading logs</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-md">{error}</p>
+            <h3 className="text-lg font-medium text-destructive">
+              Error loading logs
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md">
+              {error}
+            </p>
             <Button variant="outline" className="mt-4" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
@@ -351,34 +503,69 @@ export default function AuditPage() {
           </div>
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center border rounded-lg bg-card shadow-sm p-8">
-            <h3 className="text-lg font-medium text-foreground">No audit records found</h3>
+            <h3 className="text-lg font-medium text-foreground">
+              No audit records found
+            </h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-md">
-              System activity will appear here once users begin interacting with the platform. Try adjusting your filters if you&apos;re looking for specific events.
+              System activity will appear here once users begin interacting with
+              the platform. Try adjusting your filters if you&apos;re looking
+              for specific events.
             </p>
           </div>
         ) : (
-        <>
-          {/* Desktop Grid (AG Grid) */}
-          <div className="hidden lg:block flex-1 min-h-[500px] w-full border rounded-lg overflow-hidden shadow-sm">
-            <AuditDesktopGrid
-              logs={logs}
-              onRowClick={handleLogSelect}
-            />
-          </div>
-
-          {/* Mobile Cards List */}
-          <div className="block lg:hidden flex-1 overflow-y-auto pb-6">
-            <div className="text-sm text-muted-foreground mb-4">
-              Showing {logs.length} of {totalCount} audit logs
+          <>
+            {/* Desktop Grid (AG Grid) */}
+            <div className="hidden lg:block flex-1 min-h-[500px] w-full border rounded-lg overflow-hidden shadow-sm">
+              <AuditDesktopGrid logs={logs} onRowClick={handleLogSelect} />
             </div>
-            <AuditMobileList
-              logs={logs}
-              onCardClick={handleLogSelect}
-            />
+
+            {/* Mobile Cards List */}
+            <div className="block lg:hidden flex-1 overflow-y-auto pb-6">
+              <AuditMobileList logs={logs} onCardClick={handleLogSelect} />
+            </div>
+          </>
+        )}
+        {!isLoading && !error && totalCount > 0 && (
+          <div className="flex items-center justify-between gap-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {(page - 1) * PAGE_SIZE + 1}–
+              {Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} audit
+              logs
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPage((currentPage) => Math.max(1, currentPage - 1))
+                }
+                disabled={page === 1 || isRefreshing}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Previous</span>
+              </Button>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPage((currentPage) =>
+                    Math.min(totalPages, currentPage + 1),
+                  )
+                }
+                disabled={page >= totalPages || isRefreshing}
+                aria-label="Next page"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </>
-      )}
-    </div>
+        )}
+      </div>
 
       {/* Drawers & Modals */}
       <AuditDetailsDrawer
@@ -387,12 +574,12 @@ export default function AuditPage() {
         log={selectedLog}
       />
 
-      <ExportModal 
+      <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         onExport={handleExportExecute}
         isLoading={isExporting}
       />
     </div>
-  )
+  );
 }

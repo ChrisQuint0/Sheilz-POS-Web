@@ -117,9 +117,6 @@ export function AuditDesktopGrid({ logs, onRowClick }: AuditDesktopGridProps) {
         onRowClick(event.data as AuditLog)
       }
     },
-    pagination: true,
-    paginationPageSize: 20,
-    paginationPageSizeSelector: [20, 50, 100],
     domLayout: "normal",
     rowHeight: 52,
     headerHeight: 48,
